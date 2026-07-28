@@ -1217,6 +1217,7 @@ Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both
 | 5 | Approval to request a **`gpt-image-2` quota increase** (capacity is 2 today) | job reliability |
 | 6 | ~~Confirm the $SMILE economy parameters~~ — **settled: Genesis Rain 365,000, Bloom Fee 100 → 3,650 slimes = exactly 10 years** (see [§8.3](#83-the-economy-genesis-rain--bloom-burn--claim-pool)) | ✅ |
 | 7 | ~~Confirm the three-step chain rollout~~ — **settled: step 1 anchor-only → step 2 $SMILE → step 3 adoption**, all in scope, none deferred. The **sales model stays deliberately open** and is not designed yet | ✅ |
+| 8 | ~~Confirm the reference-image strategy~~ — **settled: `mochibo.png` is sent on every generation as the anatomy canon**, with a per-rarity exemplar as a second `image[]` once the seed slimes exist (see [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape)) | ✅ |
 
 ---
 
