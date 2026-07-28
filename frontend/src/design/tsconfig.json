@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "tokens.ts",
+    "types.ts",
+    "index.ts",
+    "tailwind.preset.ts",
+    "tailwind.config.ts",
+    "vite-env.d.ts",
+    "lib",
+    "hooks",
+    "components",
+    "preview.tsx",
+    "preview.entry.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "vite.config.ts", "screenshot.mjs"]
+}

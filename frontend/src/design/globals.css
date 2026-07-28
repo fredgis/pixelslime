@@ -1,0 +1,256 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   PIXELSLIME — globals.css
+   The visual identity of the design system, ported faithfully from the approved
+   docs/mockup/index.html. Every colour here is a CSS custom property whose value
+   comes from contracts/design-tokens.json (mirrored in tokens.ts). Components read
+   these variables and the `.ps-*` classes below; nothing hard-codes a hex.
+
+   W6: import this ONCE at the app root (e.g. `import '@/design/globals.css'`).
+   Toggle the dark theme by setting `data-theme="night"` on <html> or any wrapper.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Fonts — all three SIL Open Font License, from Google Fonts.
+   `display=swap` is deliberate: the fallback shows instantly (no invisible text)
+   and the pixel faces swap in without blocking paint. Pair with a monospace
+   fallback so the metric swap is small. W6 may additionally add <link rel=preload>
+   in index.html for the fastest possible swap. */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap');
+
+/* ── Tokens as CSS custom properties (light theme) ──────────────────────── */
+:root {
+  --ps-cream: #FFF6E5;
+  --ps-paper: #FFFDF7;
+  --ps-bubblegum: #FF8FC5;
+  --ps-mint: #7FE3C0;
+  --ps-sky: #8FD3FF;
+  --ps-grape: #8B6FE8;
+  --ps-sunbeam: #FFD86B;
+  --ps-coral: #FF7A59;
+  --ps-ink: #2B1B4A;
+  --ps-ink-soft: #5B4A7D;
+
+  --ps-r-common: #9FB4C7;
+  --ps-r-uncommon: #7FE3C0;
+  --ps-r-rare: #8FD3FF;
+  --ps-r-epic: #C08BFF;
+  --ps-r-legendary: #FFD86B;
+  --ps-r-mythic: #FF8FC5;
+
+  --ps-pop: cubic-bezier(.34, 1.56, .64, 1);
+  --ps-shadow-card: 0 10px 0 rgba(43, 27, 74, .14), 0 18px 40px rgba(43, 27, 74, .20);
+  --ps-chunk: 0 6px 0 var(--ps-ink);
+  --ps-border: 4px solid var(--ps-ink);
+  --ps-radius-sm: 12px;
+  --ps-radius-md: 16px;
+  --ps-radius-lg: 22px;
+  --ps-radius-xl: 26px;
+
+  --ps-font-pixel: 'Press Start 2P', ui-monospace, monospace;
+  --ps-font-round: 'M PLUS Rounded 1c', system-ui, sans-serif;
+  --ps-font-stat: 'Silkscreen', ui-monospace, monospace;
+
+  /* dotted paper texture tint */
+  --ps-dot: rgba(139, 111, 232, .16);
+}
+
+/* ── MOONLIT PUNIVERSE — dark theme ─────────────────────────────────────── */
+[data-theme='night'] {
+  --ps-cream: #1A1230;
+  --ps-paper: #241A3F;
+  --ps-ink: #FFF1D6;
+  --ps-ink-soft: #C3B0E8;
+  --ps-shadow-card: 0 10px 0 rgba(0, 0, 0, .45), 0 18px 40px rgba(0, 0, 0, .55);
+  --ps-dot: rgba(195, 176, 232, .14);
+}
+
+/* ── The design surface ─────────────────────────────────────────────────── */
+.ps-surface {
+  position: relative;
+  font-family: var(--ps-font-round);
+  color: var(--ps-ink);
+  background: var(--ps-cream);
+  -webkit-font-smoothing: antialiased;
+  transition: background .5s ease, color .5s ease;
+}
+.ps-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .5;
+  background-image: radial-gradient(circle at 1px 1px, var(--ps-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+.ps-surface > * { position: relative; z-index: 1; }
+
+/* Shared visible focus ring that fits the aesthetic (kawaii, chunky, high-contrast). */
+.ps-focusable:focus-visible,
+.ps-btn:focus-visible,
+.ps-tile:focus-visible,
+.ps-flipper:focus-visible {
+  outline: 3px dashed var(--ps-grape);
+  outline-offset: 3px;
+  border-radius: var(--ps-radius-sm);
+}
+
+/* ══════════════════ KEYFRAMES ══════════════════ */
+@keyframes ps-squish { 0%, 100% { transform: scale(1, 1); } 45% { transform: scale(1.14, .86); } 70% { transform: scale(.94, 1.08); } }
+@keyframes ps-letterhop { 0%, 62%, 100% { transform: translateY(0) scale(1, 1); } 70% { transform: translateY(-16px) scale(.9, 1.14); } 82% { transform: translateY(0) scale(1.14, .88); } 90% { transform: translateY(0) scale(1, 1); } }
+@keyframes ps-hue { to { filter: hue-rotate(360deg); } }
+@keyframes ps-pulse { 0%, 100% { opacity: .55; letter-spacing: 9px; } 50% { opacity: 1; letter-spacing: 13px; } }
+@keyframes ps-blink { 50% { opacity: 0; } }
+@keyframes ps-bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-11px) rotate(2deg); } }
+@keyframes ps-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-12px) scale(1.02); } }
+@keyframes ps-popin { 0% { transform: rotateY(180deg) scale(.86); } 60% { transform: rotateY(180deg) scale(1.05); } 100% { transform: rotateY(180deg) scale(1); } }
+@keyframes ps-sweep { from { background-position: 190% 0; } to { background-position: -90% 0; } }
+@keyframes ps-fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes ps-bobin { from { opacity: 0; transform: translateY(26px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes ps-drift { 0% { transform: translateY(20vh) translateX(0) rotate(-4deg); } 50% { transform: translateY(-10vh) translateX(30px) rotate(4deg); } 100% { transform: translateY(-40vh) translateX(0) rotate(-4deg); } }
+@keyframes ps-segpop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes ps-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ══════════════════ ANIMATED TITLE ══════════════════ */
+.ps-hero { text-align: center; position: relative; }
+.ps-eyebrow { font-family: var(--ps-font-stat); font-size: 19px; color: var(--ps-grape); letter-spacing: 9px; margin-bottom: 14px; animation: ps-pulse 3s ease-in-out infinite; }
+.ps-title { font-family: var(--ps-font-pixel); font-size: clamp(26px, 6.6vw, 62px); line-height: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: .06em; }
+.ps-title span { display: inline-block; animation: ps-letterhop 2.6s var(--ps-pop) infinite; text-shadow: 0 5px 0 var(--ps-ink), 0 9px 0 rgba(43, 27, 74, .24); }
+.ps-title--rainbow span { animation: ps-letterhop 2.6s var(--ps-pop) infinite, ps-hue 3s linear infinite; }
+.ps-subtitle { font-family: var(--ps-font-stat); font-size: clamp(12px, 2.1vw, 19px); letter-spacing: 5px; color: var(--ps-ink-soft); margin-top: 20px; min-height: 1.4em; }
+.ps-caret { animation: ps-blink 1s steps(2) infinite; }
+.ps-goo { display: block; margin: -6px auto 0; }
+
+/* ══════════════════ SLIME SPRITE ══════════════════ */
+.ps-sprite { display: block; }
+.ps-sprite--bob { animation: ps-bob 3.4s ease-in-out infinite; }
+
+/* ══════════════════ CHIP / RARITY / TYPE ══════════════════ */
+.ps-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--ps-font-stat); font-size: 14px; font-weight: 700;
+  padding: 7px 15px; border-radius: 999px;
+  border: 3px solid var(--ps-ink); background: var(--ps-paper); color: var(--ps-ink);
+  box-shadow: 0 3px 0 var(--ps-ink); white-space: nowrap;
+}
+.ps-chip--sm { font-size: 12px; padding: 5px 11px; box-shadow: 0 2px 0 var(--ps-ink); }
+
+/* ══════════════════ PIXEL BUTTON ══════════════════ */
+.ps-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--ps-font-pixel); font-size: 12px; line-height: 1;
+  padding: 15px 24px; border: var(--ps-border); border-radius: var(--ps-radius-md);
+  background: var(--ps-sunbeam); color: var(--ps-ink);
+  box-shadow: 0 6px 0 var(--ps-ink); transition: transform .14s var(--ps-pop), box-shadow .14s var(--ps-pop);
+  cursor: pointer;
+}
+.ps-btn:hover { transform: translateY(-3px); box-shadow: 0 9px 0 var(--ps-ink); }
+.ps-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ps-ink); }
+.ps-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: 0 6px 0 var(--ps-ink); }
+.ps-btn--sm { font-size: 10px; padding: 11px 16px; box-shadow: 0 5px 0 var(--ps-ink); }
+.ps-btn--block { display: flex; width: 100%; }
+
+/* ══════════════════ RIBBON ══════════════════ */
+.ps-ribbon {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--ps-font-pixel); font-size: 12px;
+  background: var(--ps-coral); color: #fff;
+  padding: 11px 20px; border: var(--ps-border); border-radius: 999px;
+  box-shadow: 0 5px 0 var(--ps-ink); transform: rotate(-2deg);
+}
+
+/* ══════════════════ COUNTDOWN ══════════════════ */
+.ps-countdown {
+  display: inline-flex; gap: 8px; align-items: center;
+  font-family: var(--ps-font-stat); font-size: 15px;
+  background: var(--ps-paper); border: 3px solid var(--ps-ink); border-radius: 999px;
+  padding: 8px 18px; box-shadow: 0 4px 0 var(--ps-ink);
+}
+.ps-countdown b { font-size: 19px; color: var(--ps-coral); font-variant-numeric: tabular-nums; }
+
+/* ══════════════════ STAT BAR ══════════════════ */
+.ps-stat { display: grid; grid-template-columns: 118px 1fr 44px; align-items: center; gap: 12px; }
+.ps-stat__lbl { font-family: var(--ps-font-stat); font-size: 14px; letter-spacing: 1px; display: inline-flex; align-items: center; gap: 7px; }
+.ps-stat__track { display: flex; gap: 3px; height: 20px; padding: 3px; background: color-mix(in srgb, var(--ps-ink) 12%, transparent); border: 3px solid var(--ps-ink); border-radius: 999px; }
+.ps-stat__seg { flex: 1; border-radius: 3px; background: color-mix(in srgb, var(--ps-ink) 12%, transparent); transition: opacity .2s var(--ps-pop), transform .2s var(--ps-pop); }
+.ps-stat__seg--on { animation: ps-segpop .32s var(--ps-pop) backwards; }
+.ps-stat__val { font-family: var(--ps-font-pixel); font-size: 13px; text-align: right; }
+
+/* ══════════════════ CARD FLIP ══════════════════ */
+.ps-flipstage { perspective: 1600px; width: 100%; max-width: 420px; margin: 0 auto; aspect-ratio: 1024 / 1536; }
+.ps-flipper { position: relative; width: 100%; height: 100%; transition: transform .6s var(--ps-pop); transform-style: preserve-3d; cursor: pointer; border-radius: var(--ps-radius-lg); padding: 0; border: none; background: none; }
+.ps-flipstage.revealed .ps-flipper { transform: rotateY(180deg); }
+.ps-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: var(--ps-radius-lg); overflow: hidden; }
+.ps-face--front {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, .30), transparent 58%),
+    repeating-linear-gradient(45deg, #6C4FD6 0 16px, #7B5CE6 16px 32px);
+  border: 6px solid var(--ps-ink); display: grid; place-items: center;
+  box-shadow: var(--ps-shadow-card); animation: ps-breathe 2.8s ease-in-out infinite;
+}
+.ps-face--front .ps-qm { font-family: var(--ps-font-pixel); font-size: 74px; color: #fff; text-shadow: 0 7px 0 rgba(0, 0, 0, .32); animation: ps-squish 2s var(--ps-pop) infinite; }
+.ps-face--front .ps-hint { position: absolute; bottom: 26px; font-family: var(--ps-font-stat); font-size: 14px; color: #fff; letter-spacing: 2px; opacity: .9; animation: ps-pulse 2s infinite; }
+.ps-face--front .ps-seal { position: absolute; top: 22px; font-family: var(--ps-font-pixel); font-size: 10px; color: var(--ps-sunbeam); letter-spacing: 2px; }
+.ps-face--back { transform: rotateY(180deg); background: transparent; }
+.ps-face--back img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 14px 26px rgba(43, 27, 74, .34)); }
+.ps-flipstage.revealed .ps-face--back { animation: ps-popin .6s var(--ps-pop); }
+
+/* Reduced-motion flip: no 3D spin, a plain crossfade instead (see media query). */
+.ps-flipstage--reduced .ps-flipper { transition: none; transform: none !important; }
+.ps-flipstage--reduced .ps-face { transition: opacity .2s ease; }
+.ps-flipstage--reduced .ps-face--back { transform: none; opacity: 0; }
+.ps-flipstage--reduced.revealed .ps-face--front { opacity: 0; }
+.ps-flipstage--reduced.revealed .ps-face--back { opacity: 1; }
+
+/* ══════════════════ SLIME CARD (gallery tile) ══════════════════ */
+.ps-tile {
+  position: relative; display: block; width: 100%; text-align: left;
+  border-radius: 20px; border: var(--ps-border); background: var(--ps-paper);
+  box-shadow: var(--ps-shadow-card); overflow: hidden; cursor: pointer;
+  transition: transform .22s var(--ps-pop), box-shadow .22s var(--ps-pop);
+}
+.ps-tile:hover { box-shadow: 0 18px 0 rgba(43, 27, 74, .14), 0 26px 50px rgba(43, 27, 74, .28); }
+.ps-tile__art { aspect-ratio: 3 / 4; display: grid; place-items: center; position: relative; overflow: hidden; padding: 6px; background: repeating-conic-gradient(from 45deg, color-mix(in srgb, var(--ps-sky) 22%, var(--ps-paper)) 0% 25%, var(--ps-paper) 0% 50%) 0 / 26px 26px; }
+.ps-tile__art img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 5px 9px rgba(43, 27, 74, .3)); }
+.ps-tile__art svg { width: 72%; animation: ps-bob 3.4s ease-in-out infinite; }
+.ps-tile__meta { padding: 12px 14px; border-top: 4px solid var(--ps-ink); background: var(--ps-paper); }
+.ps-tile__name { font-family: var(--ps-font-pixel); font-size: 11px; margin-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-tile__row { display: flex; justify-content: space-between; align-items: center; font-family: var(--ps-font-stat); font-size: 12px; color: var(--ps-ink-soft); }
+.ps-tile__serial { position: absolute; top: 9px; left: 9px; font-family: var(--ps-font-stat); font-size: 11px; background: rgba(43, 27, 74, .82); color: #fff; padding: 4px 9px; border-radius: 999px; z-index: 2; }
+.ps-tile__rartag { padding: 3px 9px; border-radius: 999px; color: var(--ps-ink); font-weight: 700; font-size: 11px; }
+.ps-tile.locked .ps-tile__art { background: repeating-linear-gradient(45deg, #3A2C5E 0 12px, #463672 12px 24px); }
+.ps-tile.locked .ps-tile__art svg { filter: brightness(0) opacity(.42); }
+.ps-tile.locked .ps-tile__name { color: var(--ps-ink-soft); }
+.ps-holo { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .62) 45%, rgba(255, 143, 197, .42) 52%, transparent 68%); background-size: 220% 220%; }
+.ps-tile:hover .ps-holo { opacity: var(--ps-holo-strength, 1); animation: ps-sweep 1.3s linear infinite; }
+.ps-newbadge { position: absolute; top: 9px; right: 9px; z-index: 2; font-family: var(--ps-font-pixel); font-size: 9px; background: var(--ps-coral); color: #fff; padding: 5px 8px; border-radius: 8px; border: 2px solid var(--ps-ink); animation: ps-squish 1.4s var(--ps-pop) infinite; }
+
+/* ══════════════════ HOLO CARD (detail tilt) ══════════════════ */
+.ps-holocard { position: relative; border-radius: 18px; overflow: hidden; transition: transform .12s ease-out; transform-style: preserve-3d; will-change: transform; }
+.ps-holocard img { width: 100%; display: block; }
+.ps-holocard__glare { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light; opacity: 0; transition: opacity .2s ease; background: radial-gradient(circle at var(--ps-glare-x, 50%) var(--ps-glare-y, 50%), rgba(255, 255, 255, .8), rgba(255, 143, 197, .35) 30%, transparent 60%); }
+.ps-holocard--active .ps-holocard__glare { opacity: 1; }
+
+/* ══════════════════ CONFETTI ══════════════════ */
+.ps-confetti { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
+
+/* ══════════════════ BACKGROUND DRIFT SLIMES ══════════════════ */
+.ps-bgslimes { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .42; overflow: hidden; }
+.ps-bgslimes .ps-drift { position: absolute; animation: ps-drift linear infinite; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION — implemented ONCE, centrally.
+   Every looping/entrance animation collapses to a quiet fade; every transition
+   is neutralised. JS-driven effects read the same signal via useReducedMotion().
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Entrance elements fade in gently instead of bouncing. */
+  .ps-animate-in { animation: ps-fade .2s ease both !important; }
+  /* Decorative drifters simply hold still. */
+  .ps-bgslimes { display: none; }
+}

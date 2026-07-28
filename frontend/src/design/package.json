@@ -1,0 +1,30 @@
+{
+  "name": "@pixelslime/design",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "PIXELSLIME design system (W5). Reusable React + TS + Tailwind components, tokens and the visual identity ported from docs/mockup/index.html.",
+  "//": "This package.json is a DEV HARNESS scoped to frontend/src/design so W5 can typecheck and preview in isolation. W6 does NOT install this; instead W6 merges the dependencies below into frontend/package.json (see README.md).",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "shot": "node screenshot.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "playwright": "^1.49.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

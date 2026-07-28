@@ -93,7 +93,7 @@ A card is serialised into **one continuous byte stream**:
 | 21 | 1 | `mood_id` | `u8` | |
 | 22 | 2 | `flags` | `u16` | see §3.3 |
 | 24 | 2 | `mint_day` | `u16` | days since **2026-01-01** (day 0) |
-| 26 | 4 | `art_sha` | `u8[4]` | first 4 bytes of the PNG's SHA-256 |
+| 26 | 4 | `art_sha` | `u8[4]` | first 4 bytes of the PNG's SHA-256. **When the card has no artwork yet, this is `00 00 00 00`** and decodes back to the string `"00000000"`. The field is never absent in the stream — the header always reserves the 4 bytes. |
 | 30 | 2 | `crc16` | `u16` | CRC-16/CCITT-FALSE over bytes `0..29` **and** the whole body |
 
 ### 3.2 `flags_rarity_type` (offset 7)
@@ -170,6 +170,11 @@ body = c.compress(joined) + c.flush()
 
 Enforced at **encode** time. Exceeding any of them is an error, never a truncation.
 
+> **Character limits and byte limits are two separate checks, and both are enforced.** A character can
+> occupy up to 4 UTF-8 bytes, so `name` at 18 characters may still be 36 bytes. The schema in
+> `contracts/card.schema.json` expresses the character limits; the byte limits below exist because the
+> byte budget is what the row is actually measured in. Check both.
+
 | Field | Max characters | Max UTF-8 bytes |
 |---|---:|---:|
 | `name` | 18 | 36 |
@@ -243,16 +248,26 @@ Written after a successful on-chain mint.
 
 An implementation is correct only if all of these hold.
 
-1. **Round-trip.** `decode(encode(card)) == card` for every field, for every vector in
-   `contracts/cards/`, and for 10,000 randomly generated valid cards.
+1. **Round-trip.** `decode(encode(card)) == card` over the **encoded fields only**, for every fixture in
+   `contracts/cards/` and for 10,000 randomly generated valid cards.
+
+   > **Encoded fields are exactly those listed in §3.1 and §3.5.** `biome` and `companion` are
+   > **display-only**: `contracts/card.schema.json` marks them "NOT encoded in PSC-1", they never enter
+   > the stream, and they are therefore unrecoverable by definition. An implementation must drop them
+   > when constructing the canonical `Card`, so that round-trip equality is well defined.
+   >
+   > *(An earlier revision of this document demanded equality "for every field", which was impossible to
+   > satisfy — W2 found the contradiction while implementing it. This is the corrected wording.)*
 2. **Determinism.** `encode(card)` is byte-identical across runs, processes and machines.
 3. **Loud failure.** Over-long fields, an out-of-range enum, a stream over 560 bytes, a bad CRC or a
    missing continuation row all raise. Nothing is ever silently truncated or defaulted.
 4. **CRC.** `crc16` is computed over header bytes `0..29` concatenated with the body, with the `crc16`
    field itself excluded. A decoder verifies it and raises on mismatch.
 5. **Text safety.** Every emitted `content` string is valid UTF-8, ≤ 175 bytes, and contains no `0x00`,
-   `\r` or `\n`. Assert this before returning — it is the one invariant asmDB will reject us for.
+   `\r` or `\n`. **Enforce this with an explicit `raise` inside `encode`, not with `assert`** — `assert`
+   is stripped under `python -O`, and this is the one invariant asmDB will reject us for.
 6. **Mochibo fits.** The reference card in `contracts/cards/mochibo.json` encodes to **at most 2 rows**.
+   *(Measured: 1 row, 52-byte stream, 65 of the 175 available bytes used.)*
 
 ---
 
