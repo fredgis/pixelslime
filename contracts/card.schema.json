@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixelslime/contracts/card.schema.json",
+  "title": "PixelSlime card",
+  "description": "The canonical shape of a PixelSlime card. This is the source of truth shared by the AI pipeline (W4), the PSC-1 codec (W2), the backend (W7) and the frontend (W6). Field length limits are enforced at encode time and are chosen so a card fits in one or two 175-byte asmDB rows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "series", "serial", "name", "level", "rarity", "type",
+    "height_mm", "weight_g",
+    "strength", "endurance", "agility", "happiness",
+    "art_id", "style_id", "frame_id", "background_id",
+    "biome_id", "mood_id",
+    "personality", "power_name", "power_desc", "quote",
+    "mint_day", "flags"
+  ],
+  "properties": {
+    "series":    { "const": "PS", "description": "Series prefix. Card id is rendered as PS-0042." },
+    "serial":    { "type": "integer", "minimum": 1, "maximum": 65535, "description": "Sequence number. Also the ERC-721 tokenId and the basis of the asmDB row id." },
+
+    "name":      { "type": "string", "minLength": 1, "maxLength": 18, "pattern": "^[^\\u0000\\u001F\\r\\n]+$" },
+    "level":     { "type": "integer", "minimum": 1, "maximum": 100 },
+    "rarity":    { "enum": ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC"] },
+    "type":      { "enum": ["FAIRY","FOREST","WATER","EMBER","STORM","STONE","SUGAR","GHOST","METAL","COSMIC","BLOOM","FROST","SLUDGE","BEAM","PAPER","DREAM"] },
+
+    "height_mm": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "weight_g":  { "type": "integer", "minimum": 1, "maximum": 65535 },
+
+    "strength":  { "type": "integer", "minimum": 0, "maximum": 100 },
+    "endurance": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "agility":   { "type": "integer", "minimum": 0, "maximum": 100 },
+    "happiness": { "type": "integer", "minimum": 0, "maximum": 100 },
+
+    "art_id":        { "type": "integer", "minimum": 0, "maximum": 255 },
+    "style_id":      { "type": "integer", "minimum": 0, "maximum": 255 },
+    "frame_id":      { "type": "integer", "minimum": 0, "maximum": 255, "description": "Frame finish. Conventionally equals the rarity ordinal." },
+    "background_id": { "type": "integer", "minimum": 0, "maximum": 255 },
+    "biome_id":      { "type": "integer", "minimum": 0, "maximum": 255 },
+    "mood_id":       { "type": "integer", "minimum": 0, "maximum": 255 },
+
+    "personality": { "type": "string", "minLength": 1, "maxLength": 90, "pattern": "^[^\\u0000\\u001F\\r\\n]+$" },
+    "power_name":  { "type": "string", "minLength": 1, "maxLength": 20, "pattern": "^[^\\u0000\\u001F\\r\\n]+$" },
+    "power_desc":  { "type": "string", "minLength": 1, "maxLength": 90, "pattern": "^[^\\u0000\\u001F\\r\\n]+$" },
+    "quote":       { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^\\u0000\\u001F\\r\\n]+$" },
+
+    "mint_day": { "type": "integer", "minimum": 0, "maximum": 65535, "description": "Days since 2026-01-01, which is day 0." },
+    "shiny":    { "type": "boolean", "default": false },
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "has_companion": { "type": "boolean", "default": false },
+        "has_accessory": { "type": "boolean", "default": false },
+        "verified":      { "type": "boolean", "default": false, "description": "Passed the step-4 vision check." },
+        "on_chain":      { "type": "boolean", "default": false },
+        "seed":          { "type": "boolean", "default": false, "description": "Hand-seeded rather than produced by the daily job." }
+      }
+    },
+
+    "art_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}$",
+      "description": "First 4 bytes of the PNG's SHA-256, lowercase hex. Proves the blob matches the card."
+    },
+
+    "biome":     { "type": "string", "maxLength": 40, "description": "Display only. NOT encoded in PSC-1 — biome_id is." },
+    "companion": { "type": "string", "maxLength": 40, "description": "Display only. NOT encoded in PSC-1." }
+  },
+
+  "$comment": "Only the fields listed in docs/CODEC.md are carried in the 175-byte payload. 'biome' and 'companion' are human-readable labels resolved from biome_id/mood_id through a client-side table, precisely because they would not fit."
+}

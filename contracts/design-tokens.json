@@ -1,0 +1,68 @@
+{
+  "$comment": "Design tokens for PIXELSLIME. Owned by W0, consumed by W5 (design system) and W6 (frontend). Mirrors the CSS custom properties in docs/mockup/index.html — the mockup is the visual reference of record.",
+  "color": {
+    "cream":     "#FFF6E5",
+    "paper":     "#FFFDF7",
+    "bubblegum": "#FF8FC5",
+    "mint":      "#7FE3C0",
+    "sky":       "#8FD3FF",
+    "grape":     "#8B6FE8",
+    "sunbeam":   "#FFD86B",
+    "coral":     "#FF7A59",
+    "ink":       "#2B1B4A",
+    "inkSoft":   "#5B4A7D",
+    "night": {
+      "cream":   "#1A1230",
+      "paper":   "#241A3F",
+      "ink":     "#FFF1D6",
+      "inkSoft": "#C3B0E8"
+    }
+  },
+  "rarity": {
+    "COMMON":    { "house": "Puddle",    "color": "#9FB4C7", "weight": 0.45,  "yieldMultiplier": 1,   "adoptPrice": 200 },
+    "UNCOMMON":  { "house": "Dewdrop",   "color": "#7FE3C0", "weight": 0.27,  "yieldMultiplier": 2,   "adoptPrice": 400 },
+    "RARE":      { "house": "Prism",     "color": "#8FD3FF", "weight": 0.17,  "yieldMultiplier": 4,   "adoptPrice": 900 },
+    "EPIC":      { "house": "Aurora",    "color": "#C08BFF", "weight": 0.08,  "yieldMultiplier": 8,   "adoptPrice": 2000 },
+    "LEGENDARY": { "house": "Starlight", "color": "#FFD86B", "weight": 0.025, "yieldMultiplier": 20,  "adoptPrice": 6000 },
+    "MYTHIC":    { "house": "Dreamdrop", "color": "#FF8FC5", "weight": 0.005, "yieldMultiplier": 100, "adoptPrice": 25000 }
+  },
+  "type": {
+    "FAIRY":  "#FF8FC5", "FOREST": "#6BC98A", "WATER":  "#5FB8E8", "EMBER":  "#FF7A59",
+    "STORM":  "#8B6FE8", "STONE":  "#A08B7A", "SUGAR":  "#FFB3D9", "GHOST":  "#B0A8D8",
+    "METAL":  "#93A4B5", "COSMIC": "#6B5BD6", "BLOOM":  "#FF9EBB", "FROST":  "#9FE0F0",
+    "SLUDGE": "#8FA860", "BEAM":   "#FFD86B", "PAPER":  "#E8D9B8", "DREAM":  "#C08BFF"
+  },
+  "font": {
+    "pixel": "'Press Start 2P', monospace",
+    "round": "'M PLUS Rounded 1c', system-ui, sans-serif",
+    "stat":  "'Silkscreen', monospace",
+    "$comment": "All three are SIL Open Font License, loaded from Google Fonts."
+  },
+  "radius":  { "sm": "12px", "md": "16px", "lg": "22px", "xl": "26px", "pill": "999px" },
+  "border":  { "width": "4px", "color": "#2B1B4A" },
+  "shadow":  {
+    "card": "0 10px 0 rgba(43,27,74,.14), 0 18px 40px rgba(43,27,74,.20)",
+    "chunk": "0 6px 0 #2B1B4A"
+  },
+  "motion": {
+    "easing":   "cubic-bezier(.34,1.56,.64,1)",
+    "fast":     "140ms",
+    "base":     "240ms",
+    "slow":     "600ms",
+    "$comment": "Nothing exceeds 600ms. prefers-reduced-motion must degrade every animation to a fade."
+  },
+  "card": {
+    "width":       1024,
+    "height":      1536,
+    "aspectRatio": "1024/1536",
+    "thumbWidth":  512,
+    "thumbHeight": 768,
+    "$comment": "Both dimensions must stay divisible by 16 — gpt-image-2 rejects anything else."
+  },
+  "schedule": {
+    "publishHour": 10,
+    "timezone":    "Europe/Paris",
+    "cron":        "0 8,9 * * *",
+    "$comment": "Container Apps cron is UTC-only. Both hours fire; the job exits unless it is 10:00 in Europe/Paris."
+  }
+}

@@ -1,0 +1,339 @@
+openapi: 3.1.0
+info:
+  title: PixelSlime API
+  version: 1.0.0
+  description: |
+    Public, read-only API for the PixelSlime SLIMEDEX.
+
+    There is **no authentication**. The site is public and anonymous — per-visitor state
+    (which slimes you have opened, theme, reduced motion) lives in `localStorage` and is
+    never sent to the server.
+
+    The only write path is the daily Container Apps Job, which is not reachable from the
+    internet. `/api/admin/generate` is guarded by a Key Vault admin token header and is off
+    by default.
+
+    This document is the **contract** between W6 (frontend) and W7 (backend). W6 generates
+    its mock server from this file, so it must never drift.
+
+servers:
+  - url: /
+
+tags:
+  - name: cards
+  - name: media
+  - name: meta
+
+paths:
+  /api/health:
+    get:
+      tags: [meta]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, cards, engine]
+                properties:
+                  status: { type: string, enum: [ok, degraded] }
+                  cards:  { type: integer, description: Number of cards in the index }
+                  engine: { type: string, description: asmDB engine version }
+
+  /api/cards/today:
+    get:
+      tags: [cards]
+      summary: The card of the day, plus the countdown to the next one
+      responses:
+        "200":
+          description: Today's bloom
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [card, nextBloomAt, secondsUntilNext, dayNumber]
+                properties:
+                  card:             { $ref: "#/components/schemas/Card" }
+                  nextBloomAt:      { type: string, format: date-time, description: Next 10:00 Europe/Paris, in UTC }
+                  secondsUntilNext: { type: integer }
+                  dayNumber:        { type: integer, description: How many slimes have bloomed so far }
+        "404":
+          description: No card has bloomed today yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/cards:
+    get:
+      tags: [cards]
+      summary: Paginated SLIMEDEX, served from the in-memory index
+      parameters:
+        - { name: page,   in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size,   in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 24 } }
+        - { name: type,   in: query, schema: { $ref: "#/components/schemas/SlimeType" } }
+        - { name: rarity, in: query, schema: { $ref: "#/components/schemas/Rarity" } }
+        - { name: sort,   in: query, schema: { type: string, enum: [newest, oldest, rarest, happiest], default: newest } }
+        - { name: q,      in: query, schema: { type: string, maxLength: 40 }, description: Case-insensitive name search }
+      responses:
+        "200":
+          description: A page of cards
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, total, hasMore]
+                properties:
+                  items:   { type: array, items: { $ref: "#/components/schemas/CardSummary" } }
+                  page:    { type: integer }
+                  size:    { type: integer }
+                  total:   { type: integer }
+                  hasMore: { type: boolean }
+
+  /api/cards/{serial}:
+    get:
+      tags: [cards]
+      summary: One fully decoded card
+      parameters: [{ $ref: "#/components/parameters/Serial" }]
+      responses:
+        "200":
+          description: The card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "404":
+          description: No such card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/cards/{serial}/raw:
+    get:
+      tags: [cards]
+      summary: The PSC-1 payload exactly as it lives in asmDB — the provenance view
+      parameters: [{ $ref: "#/components/parameters/Serial" }]
+      responses:
+        "200":
+          description: Raw rows plus their decoding
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rows, streamBytes, rowCount, cardHash, decoded]
+                properties:
+                  rows:
+                    type: array
+                    description: The asmDB rows verbatim. Integers are strings, as asmDB returns them.
+                    items:
+                      type: object
+                      required: [id, value, tag, content]
+                      properties:
+                        id:      { type: string, example: "16" }
+                        value:   { type: string, example: "20260728" }
+                        tag:     { type: string, example: "psc.1.0" }
+                        content: { type: string, description: Z85, at most 175 bytes }
+                  streamBytes: { type: integer, description: Length of the PSC-1 stream before Z85 }
+                  rowCount:    { type: integer }
+                  cardHash:    { type: string, pattern: "^0x[0-9a-f]{64}$", description: keccak256 of the stream — what is minted on-chain }
+                  decoded:     { $ref: "#/components/schemas/Card" }
+        "404":
+          description: No such card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/cards/{serial}/image:
+    get:
+      tags: [media]
+      summary: The card PNG, proxied from private Blob Storage
+      parameters: [{ $ref: "#/components/parameters/Serial" }]
+      responses:
+        "200":
+          description: 1024x1536 PNG with alpha
+          headers:
+            Cache-Control: { schema: { type: string, example: "public, max-age=31536000, immutable" } }
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "404": { description: No such card }
+
+  /api/cards/{serial}/thumb:
+    get:
+      tags: [media]
+      summary: The 512x768 WebP thumbnail
+      parameters: [{ $ref: "#/components/parameters/Serial" }]
+      responses:
+        "200":
+          description: WebP thumbnail
+          content:
+            image/webp:
+              schema: { type: string, format: binary }
+        "404": { description: No such card }
+
+  /api/stats:
+    get:
+      tags: [meta]
+      summary: Collection-wide counters
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, byRarity, byType, genesisRemaining, bloomsRemaining]
+                properties:
+                  total: { type: integer }
+                  byRarity:
+                    type: object
+                    additionalProperties: { type: integer }
+                  byType:
+                    type: object
+                    additionalProperties: { type: integer }
+                  genesisRemaining: { type: integer, description: SMILE left in the Genesis Rain }
+                  bloomsRemaining:  { type: integer, description: Slimes that can still be minted }
+
+  /api/nft/{serial}:
+    get:
+      tags: [meta]
+      summary: ERC-721 metadata for the card
+      parameters: [{ $ref: "#/components/parameters/Serial" }]
+      responses:
+        "200":
+          description: ERC-721 metadata document
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, description, image, attributes]
+                properties:
+                  name:        { type: string }
+                  description: { type: string }
+                  image:       { type: string, format: uri }
+                  external_url: { type: string, format: uri }
+                  attributes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        trait_type:   { type: string }
+                        value:        {}
+                        display_type: { type: string }
+        "404": { description: No such card }
+
+  /api/admin/generate:
+    post:
+      tags: [meta]
+      summary: Trigger a generation by hand. Off by default.
+      security:
+        - adminToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forceRarity: { $ref: "#/components/schemas/Rarity" }
+                dryRun:      { type: boolean, default: false }
+      responses:
+        "202": { description: Generation accepted }
+        "401": { description: Missing or wrong admin token }
+        "409": { description: A card already exists for today }
+
+components:
+  securitySchemes:
+    adminToken:
+      type: apiKey
+      in: header
+      name: X-PixelSlime-Admin
+
+  parameters:
+    Serial:
+      name: serial
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 65535 }
+
+  schemas:
+    Rarity:
+      type: string
+      enum: [COMMON, UNCOMMON, RARE, EPIC, LEGENDARY, MYTHIC]
+
+    SlimeType:
+      type: string
+      enum: [FAIRY, FOREST, WATER, EMBER, STORM, STONE, SUGAR, GHOST,
+             METAL, COSMIC, BLOOM, FROST, SLUDGE, BEAM, PAPER, DREAM]
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:    { type: string }
+            message: { type: string }
+
+    CardSummary:
+      type: object
+      description: What the gallery grid needs, and nothing more.
+      required: [serial, cardId, name, level, rarity, type, mintDate, thumbUrl]
+      properties:
+        serial:   { type: integer }
+        cardId:   { type: string, pattern: "^PS-[0-9]{4,5}$", example: "PS-0001" }
+        name:     { type: string }
+        level:    { type: integer }
+        rarity:   { $ref: "#/components/schemas/Rarity" }
+        type:     { $ref: "#/components/schemas/SlimeType" }
+        shiny:    { type: boolean }
+        mintDate: { type: string, format: date }
+        thumbUrl: { type: string }
+        onChain:  { type: boolean }
+
+    Card:
+      type: object
+      description: The full card. Mirrors contracts/card.schema.json plus derived display fields.
+      required: [serial, cardId, name, level, rarity, type, height_mm, weight_g,
+                 strength, endurance, agility, happiness,
+                 personality, power_name, power_desc, quote, mintDate, imageUrl, thumbUrl]
+      properties:
+        serial:    { type: integer }
+        cardId:    { type: string, example: "PS-0001" }
+        name:      { type: string, maxLength: 18 }
+        level:     { type: integer, minimum: 1, maximum: 100 }
+        rarity:    { $ref: "#/components/schemas/Rarity" }
+        rarityHouse: { type: string, example: "Aurora" }
+        type:      { $ref: "#/components/schemas/SlimeType" }
+        shiny:     { type: boolean }
+        height_mm: { type: integer }
+        weight_g:  { type: integer }
+        strength:  { type: integer, minimum: 0, maximum: 100 }
+        endurance: { type: integer, minimum: 0, maximum: 100 }
+        agility:   { type: integer, minimum: 0, maximum: 100 }
+        happiness: { type: integer, minimum: 0, maximum: 100 }
+        personality: { type: string, maxLength: 90 }
+        power_name:  { type: string, maxLength: 20 }
+        power_desc:  { type: string, maxLength: 90 }
+        quote:       { type: string, maxLength: 40 }
+        biome:     { type: string }
+        companion: { type: string }
+        mintDate:  { type: string, format: date }
+        dayNumber: { type: integer }
+        imageUrl:  { type: string }
+        thumbUrl:  { type: string }
+        palette:
+          type: array
+          description: Dominant colours of the artwork, so the UI can tint itself to the card.
+          items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        chain:
+          type: object
+          nullable: true
+          properties:
+            tokenId:     { type: integer }
+            txHash:      { type: string }
+            blockNumber: { type: integer }
+            explorerUrl: { type: string, format: uri }

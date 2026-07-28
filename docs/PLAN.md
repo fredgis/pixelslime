@@ -454,14 +454,24 @@ preset dictionary** (`zlib.compressobj(zdict=…)`).
 > strings DEFLATE alone is nearly useless; with a dictionary we typically see **−35 % to −50 %**.
 > Target: **the median card fits in a single row.**
 
-**Projected budget** for a typical card:
+**Measured budget** (run `python scripts/build_dict.py` to reproduce):
 
-```
-header                                   32 B
-DEFLATE text with dictionary        ~70–110 B
-                                    ─────────
-total                              ~102–142 B   →  1 row (2 for a chatty card)
-```
+| Fixture | Text raw | DEFLATE alone | With dictionary | Saved | Stream | **Rows** |
+|---|---:|---:|---:|---:|---:|---:|
+| `mochibo` — text present in the corpus | 157 B | 125 B | **20 B** | 84 % | 52 B | **1** |
+| `worstcase-unseen` — a realistic new card | 214 B | 165 B | 151 B | 8 % | 183 B | **2** |
+| `worstcase-maxlen` — every field at its limit, deliberately incompressible | 223 B | 175 B | 173 B | 1 % | 205 B | **2** |
+
+Three things worth reading off that table honestly:
+
+1. **The 84 % on Mochibo is overfit** — its exact sentences are in the training corpus. Treat it as the
+   ceiling, not the expectation. Real unseen cards land nearer **8 %**, and the dictionary is retrained
+   on actual generated cards as the collection grows (bumping `version` when it is).
+2. **Even the adversarial card fits in 2 rows**, half the 4-row ceiling. The design has 2× margin against
+   a card built specifically to defeat it.
+3. **Chunking is what makes this safe, not the dictionary.** The dictionary is upside; the multi-row
+   layout is the guarantee. That is exactly why a single-row design had to be rejected — your original
+   example needed 143 B against 140 B available and would have failed on day one.
 
 ### 4.5 Guardrails — what makes this unbreakable
 
