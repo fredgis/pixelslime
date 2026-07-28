@@ -53,6 +53,7 @@ Endpoint: `https://fgi.services.ai.azure.com/openai/v1/images/generations`
 | `n` | ≤ 10 | We generate 1 image, optionally 2 candidates for high rarities. |
 | `image`, `reference_images`, `input_fidelity`, `response_format` | ❌ **Unknown parameters on `/generations`** | You cannot pass a reference image to `/generations`. |
 | **`POST /openai/v1/images/edits`** | ✅ **Exists and accepts multipart** — `model` + `prompt` + `image=@mochibo.png` were all accepted (only a deliberately bogus field was rejected). | ✅ **This is how `mochibo.png` becomes the style template.** The single biggest unknown in this project is now resolved. |
+| **Multiple reference images** | ✅ **Supported via `image[]`.** Two files under `image[]` passed validation (the request then failed only on a deliberately invalid `size`). The singular `image` refuses duplicates and says so: *"use the array syntax instead e.g. `image[]=<value>`"*. | ✅ We can send **two** references at once — the layout canon **and** a rarity exemplar. See [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape). |
 | **Quota** | `GlobalStandard`, **capacity 2**, Sweden Central. Two calls close together → `429 … retry after 34 seconds`. | ⚠️ **Real risk.** The daily job (1 card) is fine, but seeding and retries need **exponential backoff that honours `Retry-After`**. A quota increase is recommended. |
 
 ### 1.2 The asmDB database
@@ -522,8 +523,8 @@ flowchart TD
     R["<b>1 · ROLL</b><br/>in code, not the model<br/>weighted rarity + pity timer<br/>biome · mood · companion<br/><i>seed = f(date), fully reproducible</i>"]
     M["<b>2 · METADATA</b> — gpt-5.6-sol<br/>Structured Outputs against a JSON Schema<br/>master prompt + the roll + names already used<br/><i>length-capped, all English</i>"]
     V1{"Pydantic valid<br/>and PSC-1 encodes?"}
-    I["<b>3 · IMAGE</b> — gpt-image-2<br/>POST /openai/v1/images/edits (multipart)<br/>image = mochibo.png · 1024x1536<br/>background transparent · quality high · png"]
-    V2{"Vision check:<br/>name, level, rarity, stats<br/>match the JSON?<br/>alpha present?"}
+    I["<b>3 · IMAGE</b> — gpt-image-2<br/>POST /openai/v1/images/edits (multipart)<br/>image[] = mochibo.png (anatomy canon, always)<br/>image[] = ref of the rolled rarity<br/>1024x1536 · transparent · quality high · png"]
+    V2{"Vision check:<br/>name, level, rarity, stats<br/>match the JSON?<br/>alpha present?<br/>not a Mochibo clone?"}
     P["<b>5 · POST-PROCESSING</b> — Pillow<br/>alpha trim · 512x768 WebP thumb<br/>SHA-256 · dominant palette"]
     S["<b>6 · PERSISTENCE</b><br/>Blob upload → PSC-1 encode → POST /v1/rows"]
     RB{"Read back,<br/>decode, compare<br/>byte for byte?"}
@@ -609,7 +610,18 @@ drawn in rich, detailed PIXEL ART.
 
 ── RARITY ──────────────────────────────────────────────────────────────
 · A level and a rarity must be generated.
-· The rarer the card, the more exceptional its colours and its frame.
+· The card ANATOMY never changes, whatever the rarity: same portrait
+  proportions, same rounded border, same title bar, same type pill, same
+  rarity badge position, same art window, same stat block, same footer.
+· What changes with rarity is the FINISH only — frame material and
+  ornamentation, richness of the palette, gems, foil, glow, particles.
+  The rarer the card, the more exceptional its colours and its frame.
+     COMMON    plain wooden frame, soft muted palette
+     UNCOMMON  silver frame, a light halo
+     RARE      blue frame, prismatic highlights
+     EPIC      gold and violet frame, a crown gem, sparkle
+     LEGENDARY animated celestial frame, constellation backdrop
+     MYTHIC    rainbow foil, a frame that overflows its own bounds
 
 ── NAMING ──────────────────────────────────────────────────────────────
 · Be imaginative with slime names — random, but fun.
@@ -618,19 +630,68 @@ drawn in rich, detailed PIXEL ART.
 At runtime the job appends the exact values drawn in steps 1–2 (name, level, rarity, type, stats, biome,
 companion, power, quote), so the model is never left to invent numbers the database will disagree with.
 
-### 5.2 A note on the reference image
+### 5.2 The reference strategy — keeping every card the same shape
 
-`mochibo.png` is the **style reference** handed to `/images/edits`. Worth knowing before we use it:
+**Yes: `mochibo.png` is sent on every single generation.** That is the whole point of using
+`/images/edits`, and it is the mechanism that guarantees the cards share one external appearance
+instead of drifting into 3,650 different layouts. It is now confirmed to work end to end.
+
+But there is one wrinkle worth naming, because it decides whether your own brief is actually delivered:
+
+> **Mochibo is an EPIC card.** Its frame is ornate gold and violet with a gem at the crown. If it is the
+> only reference for every card, a COMMON slime inherits an EPIC-looking frame — and
+> *"the rarer the card, the more exceptional its colours and its frame"* quietly stops being true.
+> Rarity becomes invisible, which is the one thing a collectible cannot afford.
+
+The fix is **not** to stop sending Mochibo. It is to separate two things the reference is currently
+being asked to carry at once:
+
+| | **Card anatomy** — always identical | **Rarity finish** — varies by tier |
+|---|---|---|
+| What it covers | Portrait 1024×1536 · rounded border · fully transparent outside · title bar with name + level · type pill · rarity badge top-right · large art window · height/weight strip · personality + power block bottom-left · four stat bars bottom-right · quote bubble · ID footer | Frame material and ornamentation · palette richness · gems, foil, glow, particles · how far the frame is allowed to break its own bounds |
+| Where it comes from | **`mochibo.png`, sent every time** | the **prompt**, plus a per-tier exemplar once one exists |
+
+So the anatomy is pinned by the image, and the finish is pinned by words. Both are versioned.
+
+**And because `image[]` accepts multiple files** ([§1.1](#11-the-gpt-image-2-image-service)), we can do
+better than words alone as the collection grows:
+
+```
+image[] = assets/template/mochibo.png     ← the anatomy canon, ALWAYS sent
+image[] = assets/template/ref-<rarity>.png ← an approved exemplar of the rolled tier, once we have one
+```
+
+Bootstrap path, which is exactly why the seed slimes exist:
+
+1. **Day one** — only Mochibo exists. Every card is generated from it, with the rarity finish described
+   in the prompt. Mochibo is also permanently `ref-epic.png`, because it genuinely *is* an EPIC card.
+2. **The three seed slimes** (one COMMON, one RARE, one LEGENDARY) are generated deliberately to create
+   the missing tier exemplars, and are reviewed by hand before being promoted.
+3. **From then on** every generation sends two references: the anatomy canon plus the exemplar for the
+   tier that was rolled. Consistency is guaranteed by the first, rarity by the second.
+
+Two guardrails so the reference never bleeds into the artwork itself — you asked for the slime's shape
+to be random and *"completely different from the reference image"*:
+
+- The prompt states explicitly that the reference defines **card style and layout, not the creature and
+  not the scene**.
+- Step 4's vision check adds a **similarity guard**: if a card comes back with a pink dome slime in a
+  cosy reading room with a cat, it is too close to Mochibo and gets regenerated.
+
+### 5.3 A note on the reference file itself
+
+Worth knowing before we use it:
 
 > I inspected the file. It is **`RGB`, 1024×1536, with no alpha channel at all** — the "transparent"
 > area around the card is a **checkerboard pattern painted into the pixels** (8-px cells alternating
 > `#E6E7E6` / `#FDFDFD`).
 
 The prompt is what enforces transparency, so this is not a blocker. But feeding a picture of a
-checkerboard to an image model as a style reference is asking it to **paint a checkerboard**. So W0
-ships a cleaned template: flood-fill the checkerboard from the corners, convert it to a true alpha
-channel, and store the result as `assets/template/mochibo.png` (the original is kept alongside as
-`mochibo-original.png`). Cheap to do, and it removes an entire class of weird output.
+checkerboard to an image model as a style reference is asking it to **paint a checkerboard**. So a
+cleaned template ships with the repo: flood-fill the checkerboard from the corners, convert it to a true
+alpha channel, and store the result as `assets/template/mochibo.png` (the original is kept alongside as
+`mochibo-original.png`). **Already done** — `scripts/clean_template.py`, 17.8 % transparent, corner
+alpha 0. Cheap, and it removes an entire class of weird output.
 
 ---
 
@@ -1084,7 +1145,8 @@ pixelslime/
 │  └─ src/  design/  components/  pages/  hooks/  mocks/
 ├─ chain/                   Foundry: src/ test/ script/
 ├─ assets/
-│  ├─ template/mochibo.png  the reference card
+│  ├─ template/mochibo.png  the anatomy canon — sent on every generation
+│  ├─ template/ref-*.png    per-rarity finish exemplars, promoted by hand
 │  └─ psdict_v1.bin         the DEFLATE dictionary
 ├─ scripts/                 seed, backfill, export
 └─ .github/workflows/       ci.yml, deploy.yml
@@ -1103,9 +1165,12 @@ pixelslime/
 | **M4 — It runs itself** | W8 + W10 | The cron job has run three days straight unattended; E2E tests pass |
 | **M5 — The chain** | W9 | **Step 1**: `PixelSlimeCard` deployed on Amoy, one card anchored, on-chain badge visible. **Step 2**: `$SMILE` + Genesis Rain live, first bloom burn visible on the explorer |
 
-**The 3 seed slimes** you asked for: generated at M2/M3 with deliberately contrasting forced rarities, so
-the gallery looks good on day one and every tier's rendering gets validated — one **COMMON**, one
-**RARE**, one **LEGENDARY**. Mochibo (EPIC) is imported as reference card **PS-0001**.
+**The 3 seed slimes** you asked for: generated at M2/M3 with deliberately contrasting forced rarities —
+one **COMMON**, one **RARE**, one **LEGENDARY**. They serve two purposes at once: the gallery looks good
+on day one, and each one is reviewed by hand and promoted to `assets/template/ref-<rarity>.png`, filling
+in the per-tier finish exemplars described in [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape).
+Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both the anatomy canon and
+`ref-epic.png`.
 
 ---
 
@@ -1118,7 +1183,9 @@ the gallery looks good on day one and every tier's rendering gets validated — 
 | R3 | Generated text exceeds the byte budget | Medium | Length constraints in the schema + DEFLATE dictionary + chunking up to 4 rows + loud failure and regeneration |
 | R4 | asmDB cold start (free tier sleeps) | Medium | `/health` warm-up before writes, retry on `instance_starting`, backend index cache |
 | R5 | The model renders misspelled or unreadable text inside the image | Medium | Step 4 vision verification + regeneration; displayed stats always come from the JSON, which is the source of truth |
-| R6 | Style drift across cards over months | Low | Versioned master prompt, pinned `style_id`, the reference card is always sent |
+| R6 | Style drift across cards over months | Low | Versioned master prompt, pinned `style_id`, and **the anatomy canon `mochibo.png` is sent on every single generation** — that is what keeps the external appearance identical across the whole collection |
+| R12 | The opposite failure: every card looks **EPIC**, because the only reference is an EPIC card, so rarity stops being visible | **Medium** | Split anatomy from finish ([§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape)): the image pins the layout, the prompt pins the tier finish, and a per-rarity exemplar is added as a second `image[]` once the seed slimes exist |
+| R13 | Cards come back as near-clones of Mochibo (pink dome, reading room, cat) | Medium | The prompt states the reference defines layout **not** the creature or scene; the step-4 vision check adds a similarity guard that forces a regeneration |
 | R7 | Uncontrolled image cost | Low | 1 image/day, hard cap in the job, Azure budget alert |
 | R8 | Loss of the asmDB bearer | Low | Rotation procedure documented in the runbook |
 | R9 | The reference template has **no alpha channel** — its "transparency" is a painted checkerboard, which an image model may reproduce as literal art | **Low** *(already fixed)* | Solved: `scripts/clean_template.py` flood-fills the checkerboard into a real alpha channel. **Already run** — `assets/template/mochibo.png` is now RGBA, 17.8 % transparent, corner alpha 0. Original kept as `mochibo-original.png`. |
