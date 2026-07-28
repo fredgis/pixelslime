@@ -349,7 +349,7 @@ footer small{font-family:var(--font-stat);font-size:13px;color:var(--ink-soft)}
       <button data-go="bank">SMILE BANK</button>
     </nav>
     <button class="iconbtn" id="themeBtn" title="Moonlit Puniverse">🌙</button>
-    <button class="keeper" onclick="toast('Optional — phase 2. The gallery is public and needs no login. 🫧')">
+    <button class="keeper" onclick="toast('Optional. The gallery is public and needs no login. 🫧')">
       <span class="av">🫧</span>CONNECT WALLET
     </button>
   </div>
@@ -483,13 +483,13 @@ footer small{font-family:var(--font-stat);font-size:13px;color:var(--ink-soft)}
     <div class="info"><h3>3 · PAINT</h3><p><b>gpt-image-2</b> paints the card at 1024×1536 with a transparent background, using this very template as the style reference.</p></div>
     <div class="info"><h3>4 · CHECK</h3><p>A vision model reads the finished card back and verifies every number matches the JSON. Mismatch → repaint.</p></div>
     <div class="info"><h3>5 · PACK</h3><p>The card is packed into <b>PSC-1</b>: 32-byte header + dictionary-DEFLATE text, Z85-encoded into asmDB rows of 175 bytes.</p></div>
-    <div class="info"><h3>6 · ANCHOR</h3><p>Phase 2 — the packed bytes are hashed and minted on-chain as proof the slime existed exactly like this, on that day.</p></div>
+    <div class="info"><h3>6 · ANCHOR</h3><p>The packed bytes are hashed with keccak256 and minted on-chain as proof the slime existed exactly like this, on that day.</p></div>
   </div>
 </section>
 
 <!-- ═══════════════ SCREEN: SMILE BANK ═══════════════ -->
 <section class="screen" id="bank">
-  <h2 class="sec-title">SMILE BANK <span class="soon">PHASE 2</span></h2>
+  <h2 class="sec-title">SMILE BANK <span class="soon">STEP 2</span></h2>
   <p class="sec-sub">Happiness cannot be created by decree. It has to be felt first.</p>
 
   <div class="bank">
@@ -499,9 +499,9 @@ footer small{font-family:var(--font-stat);font-size:13px;color:var(--ink-soft)}
       <b>finite puddle</b> of happiness. Every slime that condenses out of the sky spends a little of it —
       and it is <b>never refilled</b>.</p>
       <div class="coin">$</div>
-      <div class="balance" id="genesisLeft">998,400</div>
+      <div class="balance" id="genesisLeft">364,900</div>
       <p style="text-align:center;font-family:var(--font-stat);font-size:13px;color:var(--ink-soft);margin-top:6px">
-        $SMILE REMAINING · <b id="bloomsLeft">9,984</b> SLIMES LEFT · ~27 YEARS</p>
+        $SMILE REMAINING · <b id="bloomsLeft">3,649</b> SLIMES LEFT · 10 YEARS</p>
       <div class="stat" style="margin-top:20px;grid-template-columns:1fr">
         <div class="track"><div class="fill f-hap" style="width:99.8%"></div></div>
       </div>
@@ -523,7 +523,7 @@ footer small{font-family:var(--font-stat);font-size:13px;color:var(--ink-soft)}
     </div>
   </div>
 
-  <h2 class="sec-title">ADOPT A SLIME <span class="soon">PHASE 3</span></h2>
+  <h2 class="sec-title">ADOPT A SLIME <span class="soon">STEP 3</span></h2>
   <p class="sec-sub">Every daily card is minted into the SLIMEDEX Vault. Spend $SMILE to bring one home —
   that burn is what finally gives the token something to be <i>for</i>.</p>
   <div class="rar-list" id="adoptList"></div>
@@ -840,11 +840,11 @@ document.getElementById('adoptList').innerHTML=Object.entries(ADOPT).map(([k,[pr
 
 /* genesis rain ticks down one bloom at a time — it is finite, that is the point */
 (function genesis(){
-  let left=9984;
+  let left=3649;
   const g=document.getElementById('genesisLeft'), b=document.getElementById('bloomsLeft');
   if(!g)return;
   setInterval(()=>{
-    left--; if(left<9900) left=9984;
+    left--; if(left<3600) left=3649;
     g.textContent=(left*100).toLocaleString();
     b.textContent=left.toLocaleString();
   },4000);

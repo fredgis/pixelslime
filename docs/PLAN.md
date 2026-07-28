@@ -6,7 +6,7 @@
 | | |
 |---|---|
 | **Product name** | **PIXELSLIME — ぷにぷにパラダイス** *(PuniPuni Paradise)* |
-| **Pitch** | One unique AI-generated PixelSlime card **every day**, showcased in the "SLIMEDEX" gallery, and (phase 2) anchored on a blockchain with the **$SMILE** token. |
+| **Pitch** | One unique AI-generated PixelSlime card **every day**, showcased in the "SLIMEDEX" gallery, and anchored on-chain with the **$SMILE** token. |
 | **Access** | **Public site — no sign-in.** Secrets stay server-side: asmDB bearer in Key Vault, AI models via the backend's managed identity. |
 | **Entra tenant** | `<TENANT_ID>` (for Azure resources only) |
 | **Subscription** | `<SUBSCRIPTION_ID>` (<SUBSCRIPTION_NAME>) |
@@ -25,7 +25,7 @@
 5. [The AI generation pipeline](#5-the-ai-generation-pipeline)
 6. [The web application](#6-the-web-application)
 7. [Security (public site)](#7-security-public-site)
-8. [Phase 2: blockchain & the $SMILE token](#8-phase-2-blockchain--the-smile-token)
+8. [Blockchain & the $SMILE token](#8-blockchain--the-smile-token)
 9. [Multi-agent development plan](#9-multi-agent-development-plan)
 10. [Repository layout](#10-repository-layout)
 11. [Milestones](#11-milestones)
@@ -175,8 +175,8 @@ rainbow foil.
 | Gallery | **SLIMEDEX** | Every card, filtered by type / rarity / date |
 | Detail | **SLIME PROFILE** | Big card, animated stats, lore, provenance |
 | Explainer | **PUNI LAB** | How rarities, types and stats work |
-| Blockchain | **SMILE BANK** | $SMILE token, mints, wallet (phase 2) |
-| Account | **KEEPER CARD** | Optional wallet connect (phase 2) — anonymous by default |
+| Blockchain | **SMILE BANK** | $SMILE token, mints, wallet |
+| Account | **KEEPER CARD** | Optional wallet connect — anonymous by default |
 
 ### 2.4 Rarities
 
@@ -224,35 +224,50 @@ overshoot), nothing longer than 600 ms, and **strict `prefers-reduced-motion` su
 Everything lands in **`FGI-ASMDBPIXELSMILES` / swedencentral** — the same region as the model, so
 image-generation latency stays minimal.
 
-```
-   Anyone on the internet — no sign-in, no account, nothing to log into
-                                    │
-   Browser ────HTTPS───►  ┌─────────▼─────────────────────────────────────────────────┐
-                          │  ca-pixelslime-api   (Azure Container App, 0→3 replicas)   │
-                          │  ─ FastAPI (Python 3.12)                                   │
-                          │  ─ ALSO serves the built React SPA → one origin, zero CORS  │
-                          └───┬───────────────┬───────────────┬───────────────┬────────┘
-                              │               │               │               │
-             Managed identity │               │               │               │
-             (user-assigned)  │               │               │               │
-                              ▼               ▼               ▼               ▼
-                 ┌────────────────┐  ┌──────────────┐  ┌────────────┐  ┌──────────────────┐
-                 │ kv-pixelslime  │  │ stpixelslime │  │ appi/log   │  │  asmdb.cloud     │
-                 │ (Key Vault)    │  │ (Blob: PNG,  │  │ (App       │  │  /db/evedvw2…    │
-                 │ asmdb-token 🔑 │  │  thumbs)     │  │  Insights) │  │  Bearer token    │
-                 └────────────────┘  └──────────────┘  └────────────┘  └──────────────────┘
-                              │
-                              │ Cognitive Services User (cross-RG)
-                              ▼
-                 ┌───────────────────────────────────────────┐
-                 │ fgi (RG FGI-AI) — gpt-image-2, gpt-5.6-sol │
-                 └───────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    NET(["🌍 Anyone on the internet<br/>no sign-in · no account · nothing to log into"])
 
-   ┌────────────────────────────────────────────────────────────────────┐
-   │  caj-pixelslime-daily  (Container Apps Job, cron "0 8,9 * * *" UTC)  │
-   │  same image as the API, different entrypoint → generates the card   │
-   │  → publishes at 10:00 Europe/Paris, all year (see §3.4)             │
-   └────────────────────────────────────────────────────────────────────┘
+    subgraph RG["🇸🇪 FGI-ASMDBPIXELSMILES · swedencentral"]
+        direction TB
+        API["<b>ca-pixelslime-api</b><br/>Azure Container App · 0 to 3 replicas<br/>FastAPI 3.12 + the built React SPA<br/><i>one origin, therefore zero CORS</i>"]
+        JOB["<b>caj-pixelslime-daily</b><br/>Container Apps Job · daily cron<br/><i>publishes at 10:00 Europe/Paris</i>"]
+        MI(["<b>id-pixelslime</b><br/>user-assigned managed identity"])
+        KV[("<b>kv-pixelslime</b><br/>Key Vault<br/>🔑 asmdb-bearer-token")]
+        ST[("<b>stpixelslime</b><br/>Blob Storage<br/>cards · thumbs")]
+        OBS["<b>appi-pixelslime</b><br/>App Insights + Log Analytics"]
+    end
+
+    AI["<b>fgi</b> · RG FGI-AI<br/>gpt-image-2 · gpt-5.6-sol"]
+    DB[("<b>asmdb.cloud</b><br/>/db/evedvw2… · smilesdb<br/><i>source of truth</i>")]
+    CHAIN["<b>Polygon Amoy</b><br/>PixelSlimeCard · SMILE"]
+
+    NET -->|HTTPS| API
+    API --> MI
+    JOB --> MI
+    MI -->|Key Vault Secrets User| KV
+    MI -->|Storage Blob Data Contributor| ST
+    MI -->|Cognitive Services User<br/>cross resource group| AI
+    MI --> OBS
+    API -->|bearer token| DB
+    JOB -->|bearer token| DB
+    JOB -->|keccak256 anchor| CHAIN
+
+    classDef net fill:#FFF6E5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef app fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef job fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef idc fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef mdl fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef dat fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef obs fill:#E7DCFF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+
+    class NET net
+    class API app
+    class JOB job
+    class MI,KV idc
+    class ST,DB dat
+    class AI,CHAIN mdl
+    class OBS obs
 ```
 
 ### 3.1 Resources to create
@@ -398,7 +413,7 @@ row id  =  serial × 16 + part          (part ∈ 0..15)
 |---:|---|
 | `0` | PSC-1 header + start of the compressed stream |
 | `1..3` | Continuation of the compressed stream (only when needed) |
-| `8` | **Blockchain anchor** (tx hash, tokenId, block) — phase 2 |
+| `8` | **Blockchain anchor** — tx hash, tokenId, block |
 | `9..15` | Reserved for future extensions |
 
 - `SELECT` by id is **O(1)** in the engine → reading a card is 1–2 GETs, never a scan.
@@ -502,47 +517,49 @@ The guiding principle: **data first, image second.** Generating the image and th
 it would be fragile. Instead we generate a structured JSON, ask `gpt-image-2` to **paint exactly that
 JSON**, then **verify** the image agrees with it.
 
-```
-┌─ 1. ROLL ────────────────────────────────────────────────────────────┐
-│ In code (not the LLM): weighted rarity + pity timer, biome, mood,     │
-│ companion, deterministic seed = f(date). Fully reproducible.          │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               ▼
-┌─ 2. METADATA ── gpt-5.6-sol + Structured Outputs (JSON Schema) ──────┐
-│ Input: your master prompt + the roll + the list of names already used │
-│ (dedup, read from the index cache).                                   │
-│ Output: the card JSON, length-constrained, 100 % English.             │
-│ Validation: Pydantic + a trial PSC-1 encode. On failure → 2 retries.  │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               ▼
-┌─ 3. IMAGE ── gpt-image-2 ────────────────────────────────────────────┐
-│ POST /openai/v1/images/edits   (multipart — CONFIRMED WORKING;        │
-│                                 `image` is rejected on /generations)  │
-│   image=assets/template/mochibo.png   ← your reference card           │
-│   size=1024x1536  background=transparent  quality=high  format=png    │
-│   prompt = style template + THE CARD JSON, field by field             │
-│ Fallback: /generations with a very detailed style prompt.             │
-│ Retry: exponential backoff honouring the Retry-After header (429).    │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               ▼
-┌─ 4. VERIFICATION ── vision model ────────────────────────────────────┐
-│ Read the rendered card back and compare name / level / rarity / stats │
-│ against the source JSON. This is the "extraction model" you mentioned. │
-│ Plus technical checks: alpha channel present, corners genuinely       │
-│ transparent, correct dimensions, portrait orientation.                │
-│ Mismatch → one more image attempt, then alert.                        │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               ▼
-┌─ 5. POST-PROCESSING ── Pillow ───────────────────────────────────────┐
-│ alpha trim, 512×768 WebP thumbnail, SHA-256, dominant palette         │
-│ (reused by the frontend to tint the UI in the card's own colours).    │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               ▼
-┌─ 6. PERSISTENCE ─────────────────────────────────────────────────────┐
-│ Blob (PNG + WebP) → PSC-1 encode → POST /v1/rows (header + parts)     │
-│ → READ BACK + decode + compare (round-trip)                           │
-│ → refresh index.json → (phase 2) mint on-chain                        │
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    R["<b>1 · ROLL</b><br/>in code, not the model<br/>weighted rarity + pity timer<br/>biome · mood · companion<br/><i>seed = f(date), fully reproducible</i>"]
+    M["<b>2 · METADATA</b> — gpt-5.6-sol<br/>Structured Outputs against a JSON Schema<br/>master prompt + the roll + names already used<br/><i>length-capped, all English</i>"]
+    V1{"Pydantic valid<br/>and PSC-1 encodes?"}
+    I["<b>3 · IMAGE</b> — gpt-image-2<br/>POST /openai/v1/images/edits (multipart)<br/>image = mochibo.png · 1024x1536<br/>background transparent · quality high · png"]
+    V2{"Vision check:<br/>name, level, rarity, stats<br/>match the JSON?<br/>alpha present?"}
+    P["<b>5 · POST-PROCESSING</b> — Pillow<br/>alpha trim · 512x768 WebP thumb<br/>SHA-256 · dominant palette"]
+    S["<b>6 · PERSISTENCE</b><br/>Blob upload → PSC-1 encode → POST /v1/rows"]
+    RB{"Read back,<br/>decode, compare<br/>byte for byte?"}
+    C["<b>7 · ANCHOR</b><br/>keccak256 of the PSC-1 stream<br/>mintCard() on Polygon Amoy<br/>tx hash → asmDB row part 8"]
+    OK(["✨ Today's Bloom is live"])
+    ALERT["🚨 Alert to App Insights<br/><i>no card is ever published half-written</i>"]
+
+    R --> M --> V1
+    V1 -->|yes| I
+    V1 -->|no, up to 2 retries| M
+    I --> V2
+    V2 -->|yes| P
+    V2 -->|no, one more attempt| I
+    V2 -->|still wrong| ALERT
+    P --> S --> RB
+    RB -->|identical| C
+    RB -->|mismatch, roll back| ALERT
+    C --> OK
+
+    classDef code fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef mdl  fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef gate fill:#FFF6E5,stroke:#8B6FE8,stroke-width:3px,color:#2B1B4A
+    classDef proc fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef data fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef chn  fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef bad  fill:#FF7A59,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef good fill:#FFF6E5,stroke:#FF7A59,stroke-width:4px,color:#2B1B4A
+
+    class R code
+    class M,I mdl
+    class V1,V2,RB gate
+    class P proc
+    class S data
+    class C chn
+    class ALERT bad
+    class OK good
 ```
 
 **Idempotency.** The business key is the date. The job starts with
@@ -647,7 +664,7 @@ channel, and store the result as `assets/template/mochibo.png` (the original is 
 | `GET` | `/api/cards/{serial}/raw` | the raw PSC-1 in Z85 plus its decoding — **the "provenance" page, very geeky, very cool** |
 | `GET` | `/api/stats` | global counters: total, rarity distribution, streak |
 | `POST` | `/api/admin/generate` | manual trigger (guarded by a Key Vault admin token header, off by default) |
-| `GET` | `/api/nft/{serial}` | ERC-721 metadata (phase 2) |
+| `GET` | `/api/nft/{serial}` | ERC-721 metadata for the NFT |
 
 Images go through a **backend proxy** (the blob container is private, no anonymous access) with a long
 cache header.
@@ -668,11 +685,11 @@ dark silhouettes with a "???" — a Pokédex-style discovery mechanic, tracked p
 
 **③ SLIME PROFILE (detail)** — The card at full size with a holographic effect driven by pointer or
 gyroscope. Beside it: an animated stat radar, lore, biome, companion, birth date, serial number, the
-blockchain badge (phase 2), and a "see the 175 bytes" link to the provenance page.
+the on-chain badge, and a "see the 175 bytes" link to the provenance page.
 
 **④ PUNI LAB** — Explains rarities, types and stats, with little slimes demonstrating in animation.
 
-**⑤ SMILE BANK** (phase 2) — $SMILE balance, mint history, block-explorer links.
+**⑤ SMILE BANK** — Genesis Rain countdown, $SMILE balance, mint history, block-explorer links.
 
 **⑥ The details that sell it** — A mascot slime wanders across the bottom of the screen now and then.
 The cursor leaves a pixel trail. A Konami code unlocks a cosmetic "secret" slime. Dark mode is
@@ -712,9 +729,9 @@ credentials, and it never hands them out.**
 
 ---
 
-## 8. Phase 2: blockchain & the $SMILE token
+## 8. Blockchain & the $SMILE token
 
-Designed **now** (the hooks are reserved in the format and the id scheme), **shipped after** the MVP.
+The chain is **in scope from the start** — not deferred. It rolls out in three steps so the provenance never waits on the economics.
 
 ### 8.1 The problem you spotted
 
@@ -758,47 +775,54 @@ The lore does the explaining, and the mechanics follow it exactly:
 > that original puddle. In exchange, the slime radiates happiness of its own — and that new happiness
 > does not go back into the puddle. It goes **to the people who come and look at it**.
 
-```
-   ┌──────────────────────────┐
-   │   GENESIS RAIN           │   one-time mint at deployment
-   │   1,000,000 $SMILE       │   held by the TREASURY (Key Vault key)
-   │   ── FINITE, NEVER       │
-   │      REFILLED ──         │
-   └───────────┬──────────────┘
-               │  every daily bloom pays a
-               │  BLOOM FEE of 100 $SMILE
-               ▼
-        ┌─────────────┐
-        │   🔥 BURNED  │   destroyed forever — the Treasury genuinely shrinks
-        └─────────────┘
+```mermaid
+flowchart TD
+    G["<b>🌧️ GENESIS RAIN</b><br/>365,000 SMILE minted once at deployment<br/>held by the Treasury, a Key Vault key<br/><b><i>FINITE — the minter role is renounced,<br/>so it can never be refilled</i></b>"]
+    BLOOM(["🫧 <b>A slime blooms</b><br/>every day at 10:00 Paris"])
+    FEE["<b>BLOOM FEE — 100 SMILE</b><br/>paid by the Treasury"]
+    BURN1["🔥 <b>BURNED</b><br/>destroyed forever<br/><i>the Treasury genuinely shrinks:<br/>3,650 blooms and the puddle is dry</i>"]
+    YIELD["<b>YIELD = happiness x rarity multiplier</b><br/>about 248 SMILE per day"]
+    POOL["<b>💧 CLAIM POOL</b><br/>a separate pool the Treasury<br/><b>has no authority to spend</b>"]
+    KEEPER(["🧑‍🌾 <b>Keepers</b><br/>optional wallet connect<br/><i>no login, anonymous by default</i>"])
+    SINK["<b>ADOPT A SLIME</b><br/>the NFT leaves the Vault"]
+    BURN2["🔥 <b>BURNED</b>"]
 
-   ┌──────────────────────────────────────────────────────────────┐
-   │  Meanwhile, the card that just bloomed MINTS new $SMILE:      │
-   │      yield = happiness × rarityMultiplier                     │
-   │  …but NOT into the Treasury. Into a separate CLAIM POOL       │
-   │  that the Treasury has no authority to spend.                 │
-   └───────────┬──────────────────────────────────────────────────┘
-               ▼
-   ┌──────────────────────────┐
-   │   CLAIM POOL             │  visitors claim from here, if they want to
-   │                          │  (optional wallet connect — still no login)
-   └───────────┬──────────────┘
-               │  PHASE 3 sinks: adopt a slime, summon a bonus slime
-               ▼
-        ┌─────────────┐
-        │   🔥 BURNED  │
-        └─────────────┘
+    G -->|every bloom| FEE
+    BLOOM --> FEE
+    FEE --> BURN1
+    BLOOM -->|mints new SMILE| YIELD
+    YIELD -->|"NOT into the Treasury"| POOL
+    POOL -->|EIP-712 signed voucher| KEEPER
+    KEEPER -->|spends SMILE| SINK
+    SINK --> BURN2
+
+    classDef genesis fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef bloom   fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef fee     fill:#E7DCFF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef burn    fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
+    classDef pool    fill:#8FD3FF,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef keeper  fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+
+    class G genesis
+    class BLOOM,YIELD bloom
+    class FEE,SINK fee
+    class BURN1,BURN2 burn
+    class POOL pool
+    class KEEPER keeper
 ```
+
+**Read the two halves separately — that is the whole trick.** The left branch only ever *drains* a
+finite purse. The right branch only ever *fills* a pool that purse cannot reach.
 
 **Why this is not circular.** The Treasury pays the fee and the fee is *burned*. The yield is minted to
 a *different* pool the Treasury cannot touch. So the Genesis Rain only ever goes **down**:
 
 ```
-1,000,000 $SMILE  ÷  100 $SMILE per bloom  =  10,000 blooms  ≈  27 years of daily slimes
+365,000 $SMILE  ÷  100 $SMILE per bloom  =  3,650 blooms  =  exactly 10 years of daily slimes
 ```
 
 That number is a feature, not an accident. The site can display it as a live countdown —
-**"GENESIS RAIN REMAINING: 998,400 $SMILE · 9,984 slimes left"** — and it is *true*. Scarcity you can
+**"GENESIS RAIN REMAINING: 364,900 $SMILE · 3,649 slimes left"** — and it is *true*. Scarcity you can
 verify on a block explorer is far more interesting than scarcity you assert in marketing copy.
 
 ### 8.4 Who holds the tokens when there are no accounts
@@ -823,7 +847,7 @@ that plainly than pretend otherwise.
 Each daily card is minted as an **ERC-721 into the SLIMEDEX Vault** (the Treasury). Cards are not
 airdropped to anyone, because there is nobody to airdrop them to.
 
-That gives Phase 3 its purpose: **adoption**. A visitor spends $SMILE to have a slime transfer out of the
+That gives chain step 3 its purpose: **adoption**. A visitor spends $SMILE to have a slime transfer out of the
 Vault into their wallet. That is the real sink, and it is what finally gives $SMILE something to be *for*.
 
 | Rarity | Adoption price | Bloom yield (happiness × mult) |
@@ -840,24 +864,57 @@ Expected yield per bloom ≈ `75 happiness × 3.31 average multiplier ≈ 248 $S
 monotonically. Every one of these numbers is a constructor parameter, tunable before deployment and
 governed by a `PARAMS` role afterwards.
 
-### 8.6 Ship it in three steps, not one
+### 8.6 The whole collection, in numbers
+
+**Settled:** Amoy testnet · Genesis Rain **365,000** · Bloom Fee **100** · one card per day.
+
+| | |
+|---|---|
+| **Slimes that will ever exist** | **3,650** |
+| **Runway** | **exactly 10 years** |
+| Genesis Rain at the end | **0** — every last token burned |
+| $SMILE in existence at the end | **≈ 905,000**, all of it minted from slime happiness |
+| asmDB rows used | ~11,000 of 393,216 free-tier rows — **2.8 %** |
+| Blob storage at year 10 | ~8.5 GB → **≈ €0.17/month** |
+| Gas | **€0** — Amoy faucet |
+
+Final rarity census, from the roll weights:
+
+| Tier | Count | | Tier | Count |
+|---|---:|---|---|---:|
+| COMMON · Puddle | ~1,643 | | EPIC · Aurora | ~292 |
+| UNCOMMON · Dewdrop | ~986 | | LEGENDARY · Starlight | ~91 |
+| RARE · Prism | ~621 | | **MYTHIC · Dreamdrop** | **~18** |
+
+> Eighteen Dreamdrops in a decade. That is the kind of scarcity worth building a countdown around —
+> and unlike most collectibles, **you can verify all of it on a block explorer**.
+
+The pleasing property of the end state: the Genesis Rain — the only $SMILE that was ever *decreed* —
+is completely gone, burned one slime at a time. Everything still standing was **earned by a slime
+radiating happiness**. The lore and the ledger agree exactly.
+
+**And on Amoy, none of this is irreversible.** The "one number you cannot change after deployment"
+warning only bites on mainnet. On a testnet we can redeploy from scratch for free, so these parameters
+are a first draft we get to observe in the wild — which is precisely the point of starting here.
+
+### 8.7 Ship it in three steps, not one
 
 The economy is the risky part; the provenance is not. So they are decoupled:
 
 | Step | What ships | Depends on the economy? |
 |---|---|---|
-| **2a · ANCHOR** | `PixelSlimeCard` ERC-721 only. Each card's PSC-1 bytes are hashed with keccak256 and minted to the Vault. The "⛓️ ON-CHAIN" badge goes live. Cost: gas only. | ❌ **No token at all.** Pure provenance. |
-| **2b · SMILE** | `SmileToken` + Genesis Rain + Bloom Fee burn + Claim Pool + wallet connect. | ✅ |
-| **3 · ADOPT** | Adoption, bonus-slime summoning, the $SMILE sinks that close the loop. | ✅ |
+| **CHAIN 1 · ANCHOR** | `PixelSlimeCard` ERC-721 only. Each card's PSC-1 bytes are hashed with keccak256 and minted to the Vault. The "⛓️ ON-CHAIN" badge goes live. Cost: gas only. | ❌ **No token at all.** Pure provenance. |
+| **CHAIN 2 · SMILE** | `SmileToken` + Genesis Rain + Bloom Fee burn + Claim Pool + wallet connect. | ✅ |
+| **CHAIN 3 · ADOPT** | Adoption, bonus-slime summoning, the $SMILE sinks that close the loop. | ✅ |
 
-**Step 2a is worth doing on its own**, and it is genuinely useful: it turns the 175-byte constraint from
+**Chain step 1 is worth doing on its own**, and it is genuinely useful: it turns the 175-byte constraint from
 a limitation into the product's best feature. The compact PSC-1 payload becomes the **canonical thing
 that gets hashed** — the chain proves a given slime existed exactly as it is, on that date, without
 duplicating a single byte of it.
 
-### 8.7 Chain choice
+### 8.8 Chain choice
 
-**Polygon PoS** — **Amoy** testnet first, mainnet only if you want it.
+**Polygon PoS** — **Amoy testnet. Settled.**
 Rationale: EVM (the richest open-source ecosystem), negligible fees, low energy footprint (PoS), and
 fully open-source tooling: **Foundry**, **OpenZeppelin Contracts** (MIT), **web3.py**.
 Alternatives considered: Base (also a solid L2); Solana (excellent for NFTs, but a separate Rust stack
@@ -866,16 +923,16 @@ and more expensive in skills here).
 On Amoy the whole economy runs on **free faucet MATIC**, which means we can operate the full loop for as
 long as we like before deciding whether real money is ever involved.
 
-### 8.8 The contracts (Solidity, OpenZeppelin)
+### 8.9 The contracts (Solidity, OpenZeppelin)
 
 | Contract | Standard | Purpose |
 |---|---|---|
 | `SmileToken.sol` | **ERC-20** `$SMILE` | `ERC20Burnable` + `AccessControl`. `GENESIS_RAIN` minted once to the Treasury in the constructor, then **the Treasury's minter role is renounced** — so the puddle provably cannot be refilled. |
 | `PixelSlimeCard.sol` | **ERC-721** | `tokenId = serial`. Stores `bytes32 cardHash = keccak256(PSC-1 stream)`. `tokenURI` → `/api/nft/{serial}`. Minted to the Vault. |
 | `ClaimPool.sol` | — | Holds bloom yield. Pays out against **EIP-712 vouchers** signed by the Key Vault key. Per-wallet and per-card caps enforced on-chain. |
-| `SlimeAdoption.sol` | — | Phase 3. Burns $SMILE, transfers the NFT out of the Vault. |
+| `SlimeAdoption.sol` | — | Chain step 3. Burns $SMILE, transfers the NFT out of the Vault. |
 
-### 8.9 Signing transactions — without ever exposing a private key
+### 8.10 Signing transactions — without ever exposing a private key
 
 Azure Key Vault supports EC keys on curve **P-256K (secp256k1)** — precisely Ethereum's curve. The
 Treasury key is created **inside Key Vault**, non-exportable, and transactions are signed through the Key
@@ -883,7 +940,7 @@ Vault API using the managed identity (`Key Vault Crypto User`). **The private ke
 and exists nowhere in the code, the environment, or the logs.**
 *(Simpler fallback if needed: private key as a Key Vault secret — weaker, but acceptable on testnet.)*
 
-### 8.10 Pipeline integration
+### 8.11 Pipeline integration
 
 After the asmDB write, the job calls `mintCard(serial, cardHash, tokenURI)`. The transaction hash,
 `tokenId` and block number are written to the card's **`part = 8` row** — which is exactly why that slot
@@ -892,7 +949,7 @@ was reserved in [§4.3](#43-why-one-row-is-not-enough--and-the-fix).
 Minting is **decoupled and replayable**: if the chain is unavailable the card still exists in asmDB, and
 a catch-up job mints the backlog. **The blockchain must never block the card of the day.**
 
-### 8.11 Decentralised storage (option)
+### 8.12 Decentralised storage (option)
 
 Pin the PNGs to **IPFS** (via an open-source pinning service) and point `tokenURI` there, so the NFT
 survives the app disappearing. Planned as an opt-in, not a dependency.
@@ -906,34 +963,55 @@ workstream freezes the interfaces; after that, eight workstreams run in parallel
 
 ### 9.1 Dependency graph
 
-```
-                        ┌──────────────────────────────┐
-                        │  W0 · CONTRACTS & SKELETON   │   (blocking, short)
-                        │  schemas, OpenAPI, tokens,   │
-                        │  test vectors, Dockerfile    │
-                        └───────────────┬──────────────┘
-        ┌───────────┬───────────┬───────┴────┬───────────┬───────────┐
-        ▼           ▼           ▼            ▼           ▼           ▼
-   ┌────────┐  ┌────────┐  ┌─────────┐  ┌────────┐  ┌────────┐  ┌────────┐
-   │W1 INFRA│  │W2 CODEC│  │W3 ASMDB │  │W4  AI  │  │W5 DSGN │  │W6 FRONT│
-   │ Bicep  │  │ PSC-1  │  │ client  │  │pipeline│  │ system │  │ React  │
-   └───┬────┘  └───┬────┘  └────┬────┘  └───┬────┘  └───┬────┘  └───┬────┘
-       │           └──────┬─────┘           │           └───────────┘
-       │                  ▼                 │                 │
-       │           ┌─────────────┐          │                 │
-       └──────────►│ W7 BACKEND  │◄─────────┘                 │
-                   │ FastAPI     │                            │
-                   └──────┬──────┘                            │
-                          ├────────────────────────────────────┘
-                          ▼
-                   ┌─────────────┐        ┌──────────────┐
-                   │ W8 DAILY JOB│        │ W9 CHAIN     │ (phase 2, independent)
-                   │             │        │ $SMILE       │
-                   └──────┬──────┘        └──────────────┘
-                          ▼
-                   ┌─────────────┐
-                   │ W10 QA / E2E│
-                   └─────────────┘
+```mermaid
+flowchart TD
+    W0["<b>W0 · CONTRACTS &amp; SKELETON</b><br/>schemas · OpenAPI · design tokens<br/>PSC-1 test vectors · Dockerfile · CI<br/><i>blocking, and deliberately short</i>"]
+
+    subgraph WAVE1["🌊 Wave 1 — five agents in parallel"]
+        direction LR
+        W1["<b>W1 · INFRA</b><br/>Bicep, RBAC"]
+        W2["<b>W2 · CODEC</b><br/>PSC-1, Z85"]
+        W3["<b>W3 · ASMDB</b><br/>REST client"]
+        W4["<b>W4 · AI</b><br/>generation pipeline"]
+        W5["<b>W5 · DESIGN</b><br/>system + mockup"]
+    end
+
+    subgraph WAVE2["🌊 Wave 2"]
+        direction LR
+        W6["<b>W6 · FRONTEND</b><br/>React, on API mocks"]
+        W7["<b>W7 · BACKEND</b><br/>FastAPI"]
+    end
+
+    W8["<b>W8 · DAILY JOB</b><br/>orchestration, idempotency"]
+    W9["<b>W9 · CHAIN</b><br/>anchor → SMILE → adoption"]
+    W10["<b>W10 · QA &amp; E2E</b><br/>Playwright, a11y, perf"]
+
+    W0 --> W1 & W2 & W3 & W4 & W5 & W9
+    W5 --> W6
+    W2 & W3 & W4 --> W7
+    W1 --> W7
+    W6 & W7 --> W10
+    W7 --> W8
+    W8 --> W9
+    W8 --> W10
+
+    classDef gate  fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef infra fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef core  fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef ai    fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef ui    fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef back  fill:#FFB3D9,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef chain fill:#E7DCFF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef qa    fill:#FF7A59,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+
+    class W0 gate
+    class W1 infra
+    class W2,W3 core
+    class W4 ai
+    class W5,W6 ui
+    class W7,W8 back
+    class W9 chain
+    class W10 qa
 ```
 
 ### 9.2 The workstreams
@@ -949,7 +1027,7 @@ workstream freezes the interfaces; after that, eight workstreams run in parallel
 | **W6** | **Frontend** | `feat/w6-frontend` | `frontend/src/` (excluding `design/`) | W0, W5 | All five screens wired to an **API mock** generated from `openapi.yaml` — so it **does not wait for W7** |
 | **W7** | **Backend API** | `feat/w7-backend` | `backend/app/api/`, `core/`, `storage/` | W2, W3, W4 | Every route, index cache, image proxy, rate limiting, health. OpenAPI contract matched exactly |
 | **W8** | **Daily job** | `feat/w8-job` | `backend/app/jobs/` | W7 | Orchestration, date idempotency, round-trip verification, App Insights alerts, backlog catch-up |
-| **W9** | **Blockchain** | `feat/w9-chain` | `chain/`, `backend/app/chain/` | W0 (+ W7 at the end) | **Step 2a first**: `PixelSlimeCard` ERC-721 + Key Vault secp256k1 signer + Amoy deployment + mint script, no token. Then 2b (`SmileToken`, Genesis Rain, burn, `ClaimPool`, EIP-712 vouchers) and 3 (`SlimeAdoption`). Foundry tests throughout |
+| **W9** | **Blockchain** | `feat/w9-chain` | `chain/`, `backend/app/chain/` | W0 (+ W7 at the end) | **Chain step 1 first**: `PixelSlimeCard` ERC-721 + Key Vault secp256k1 signer + Amoy deployment + mint script, no token. Then step 2 (`SmileToken`, Genesis Rain, burn, `ClaimPool`, EIP-712 vouchers) and step 3 (`SlimeAdoption`). Foundry tests throughout |
 | **W10** | **QA & E2E** | `feat/w10-qa` | `tests/e2e/` | W6, W7 | Playwright journeys, accessibility tests, performance budget, light load test |
 
 ### 9.3 The rules that make parallelism real
@@ -1023,7 +1101,7 @@ pixelslime/
 | **M2 — The first card** | W4 | A brand-new card is generated end to end (metadata + transparent 1024×1536 image) and verified |
 | **M3 — The site is alive** | W5 + W6 + W7 | The site is online and public, showing the daily card and the SLIMEDEX, with **3 seed slimes** in the database |
 | **M4 — It runs itself** | W8 + W10 | The cron job has run three days straight unattended; E2E tests pass |
-| **M5 — The chain** | W9 | **2a**: `PixelSlimeCard` deployed on Amoy, one card anchored, on-chain badge visible. **2b**: `$SMILE` + Genesis Rain live, first bloom burn visible on the explorer |
+| **M5 — The chain** | W9 | **Step 1**: `PixelSlimeCard` deployed on Amoy, one card anchored, on-chain badge visible. **Step 2**: `$SMILE` + Genesis Rain live, first bloom burn visible on the explorer |
 
 **The 3 seed slimes** you asked for: generated at M2/M3 with deliberately contrasting forced rarities, so
 the gallery looks good on day one and every tier's rendering gets validated — one **COMMON**, one
@@ -1045,7 +1123,7 @@ the gallery looks good on day one and every tier's rendering gets validated — 
 | R8 | Loss of the asmDB bearer | Low | Rotation procedure documented in the runbook |
 | R9 | The reference template has **no alpha channel** — its "transparency" is a painted checkerboard, which an image model may reproduce as literal art | **Low** *(already fixed)* | Solved: `scripts/clean_template.py` flood-fills the checkerboard into a real alpha channel. **Already run** — `assets/template/mochibo.png` is now RGBA, 17.8 % transparent, corner alpha 0. Original kept as `mochibo-original.png`. |
 | R10 | The site is **public** — scraping, hotlinking, or traffic spikes | Low | Read-only API, in-memory index (asmDB is never hit on the hot path), per-IP rate limiting, cached image proxy, Container Apps max 3 replicas. **Visitors cannot trigger generation**, so traffic can never increase the AI bill. |
-| R11 | $SMILE economy parameters turn out wrong after deployment | Medium | Ship **step 2a (anchor only, no token)** first. Genesis Rain is the one irreversible number — everything else sits behind a `PARAMS` role. Testnet-first means a full reset costs nothing. |
+| R11 | $SMILE economy parameters turn out wrong after deployment | Medium | Ship **chain step 1 (anchor only, no token)** first. Genesis Rain is the one irreversible number — everything else sits behind a `PARAMS` role. Testnet-first means a full reset costs nothing. |
 
 ### Decisions I made (and that you can overrule)
 
@@ -1067,11 +1145,11 @@ the gallery looks good on day one and every tier's rendering gets validated — 
 |---|---|---|
 | 1 | **GO or adjustments** on this plan and on the mockup `docs/mockup/index.html` | — |
 | 2 | The **asmDB bearer token** placed in Key Vault (I create the vault and give you the exact command; **do not send it to me in plaintext**) | the only secret I cannot manufacture |
-| 3 | Decision: **Amoy testnet (free)** or **Polygon mainnet** for $SMILE? | my recommendation: Amoy first |
+| 3 | ~~Amoy testnet or Polygon mainnet~~ — **settled: Amoy testnet.** Free faucet gas, no real money anywhere, and a redeploy costs nothing while we watch how it behaves | ✅ |
 | 4 | ~~Confirm the daily publication time~~ — **settled: 10:00 Europe/Paris**, all year round (see [§3.4](#34-publishing-at-1000-paris-all-year)) | ✅ |
 | 5 | Approval to request a **`gpt-image-2` quota increase** (capacity is 2 today) | job reliability |
-| 6 | Confirm the **$SMILE economy parameters** in [§8.3](#83-the-economy-genesis-rain--bloom-burn--claim-pool): Genesis Rain of **1,000,000**, Bloom Fee of **100** (≈ 27 years of daily slimes). Happy with those, or do you want a different runway? | it is the one number that cannot be changed after deployment |
-| 7 | Confirm we ship the chain in three steps — **2a anchor-only (no token at all)** first, then **2b $SMILE**, then **3 adoption** | de-risks the economy from the provenance |
+| 6 | ~~Confirm the $SMILE economy parameters~~ — **settled: Genesis Rain 365,000, Bloom Fee 100 → 3,650 slimes = exactly 10 years** (see [§8.3](#83-the-economy-genesis-rain--bloom-burn--claim-pool)) | ✅ |
+| 7 | ~~Confirm the three-step chain rollout~~ — **settled: step 1 anchor-only → step 2 $SMILE → step 3 adoption**, all in scope, none deferred. The **sales model stays deliberately open** and is not designed yet | ✅ |
 
 ---
 

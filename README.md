@@ -21,12 +21,21 @@
 
 **PIXELSLIME** generates **one unique AI collectible card every day at 10:00 Europe/Paris**, catalogues it
 in a public gallery, packs it into **175 bytes** inside an [asmDB Cloud](https://www.asmdb.cloud)
-database, and — later — anchors it on-chain with the **$SMILE** token.
+database, and anchors it on-chain with the **$SMILE** token.
 
-> [!NOTE]
-> **Status: PLANNING.** No application code yet, no Azure resources created yet.
-> Everything below is a design that has already been **verified against the live APIs** — read
-> **[`docs/PLAN.md`](docs/PLAN.md)** before writing a line of code.
+> [!TIP]
+> **So you want to keep a slime.**
+>
+> Slimes don't eat — they absorb **moods**. One that naps in a sunbeam turns warm and golden. One raised
+> in a library grows clever and quiet. One that meets a cat learns to purr. That's why no two are ever
+> the same: a slime is a place, a feeling and a friend, squished together.
+>
+> Every dawn, exactly **one** condenses out of the Pixel Rain — and a **Slime Keeper** has until the next
+> dawn to catalogue it before it drifts away. Rare ones arrive wrapped in colours that shouldn't exist.
+> The rarest, the **Dreamdrop**, shows up about eighteen times a decade; they say those are dreams that
+> got lost on the way to someone.
+>
+> That's the whole job. You're a Keeper now. 🫧
 
 <br>
 
