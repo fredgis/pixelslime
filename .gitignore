@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment / secrets — nothing with a credential in it ever gets committed
+.env
+.env.*
+*.pem
+*.key
+local.settings.json
+
+# Azure / Terraform / Bicep artefacts
+.azure/
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated card output (the blob store is the source of truth)
+out/
+generated/

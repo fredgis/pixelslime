@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PIXELSLIME — PuniPuni Paradise</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   DESIGN TOKENS  —  mirrored in contracts/design-tokens.json
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --cream:#FFF6E5; --bubblegum:#FF8FC5; --mint:#7FE3C0; --sky:#8FD3FF;
+  --grape:#8B6FE8; --sunbeam:#FFD86B; --ink:#2B1B4A; --coral:#FF7A59;
+  --ink-soft:#5B4A7D; --paper:#FFFDF7;
+
+  --r-common:#9FB4C7; --r-uncommon:#7FE3C0; --r-rare:#8FD3FF;
+  --r-epic:#C08BFF;   --r-legendary:#FFD86B; --r-mythic:#FF8FC5;
+
+  --pop:cubic-bezier(.34,1.56,.64,1);
+  --shadow-card:0 10px 0 rgba(43,27,74,.14), 0 18px 40px rgba(43,27,74,.20);
+  --border:4px solid var(--ink);
+  --radius:22px;
+  --font-pixel:'Press Start 2P',monospace;
+  --font-round:'M PLUS Rounded 1c',system-ui,sans-serif;
+  --font-stat:'Silkscreen',monospace;
+}
+[data-theme="night"]{
+  --cream:#1A1230; --paper:#241A3F; --ink:#FFF1D6; --ink-soft:#C3B0E8;
+  --shadow-card:0 10px 0 rgba(0,0,0,.45), 0 18px 40px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-round); color:var(--ink); background:var(--cream);
+  overflow-x:hidden; -webkit-font-smoothing:antialiased;
+  transition:background .5s ease,color .5s ease;
+}
+/* soft dotted paper texture */
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+  background-image:radial-gradient(circle at 1px 1px, rgba(139,111,232,.16) 1px, transparent 0);
+  background-size:22px 22px;
+}
+img{display:block;max-width:100%}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+/* ── floating background slimes ─────────────────────────────────── */
+#bgslimes{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.42}
+#bgslimes .drift{position:absolute;animation:drift linear infinite}
+@keyframes drift{
+  0%{transform:translateY(20vh) translateX(0) rotate(-4deg)}
+  50%{transform:translateY(-10vh) translateX(30px) rotate(4deg)}
+  100%{transform:translateY(-40vh) translateX(0) rotate(-4deg)}
+}
+
+/* ══════════════════ NAV ══════════════════ */
+header.nav{
+  position:sticky; top:0; z-index:60;
+  background:color-mix(in srgb,var(--paper) 88%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:var(--border);
+  box-shadow:0 6px 0 rgba(43,27,74,.10);
+}
+.nav-in{max-width:1240px;margin:0 auto;padding:12px 22px;display:flex;align-items:center;gap:18px}
+.brand{display:flex;align-items:center;gap:12px;font-family:var(--font-pixel);font-size:13px;letter-spacing:1px}
+.brand .dot{width:34px;height:34px;flex:0 0 34px;animation:squish 2.4s var(--pop) infinite}
+@keyframes squish{0%,100%{transform:scale(1,1)}45%{transform:scale(1.14,.86)}70%{transform:scale(.94,1.08)}}
+nav.links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+nav.links button{
+  font-family:var(--font-stat);font-size:14px;letter-spacing:.5px;
+  padding:9px 15px;border-radius:999px;border:3px solid transparent;
+  color:var(--ink-soft);transition:.18s var(--pop);white-space:nowrap;
+}
+nav.links button:hover{background:color-mix(in srgb,var(--sunbeam) 45%,transparent);transform:translateY(-2px)}
+nav.links button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.iconbtn{
+  width:42px;height:42px;border-radius:14px;border:3px solid var(--ink);
+  background:var(--sunbeam);display:grid;place-items:center;font-size:18px;
+  box-shadow:0 4px 0 var(--ink);transition:.15s var(--pop);
+}
+.iconbtn:active{transform:translateY(4px);box-shadow:0 0 0 var(--ink)}
+.keeper{
+  display:flex;align-items:center;gap:9px;padding:6px 14px 6px 6px;border-radius:999px;
+  border:3px solid var(--ink);background:var(--paper);box-shadow:0 4px 0 var(--ink);
+  font-weight:800;font-size:13px;
+}
+.keeper .av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--bubblegum),var(--grape));display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800}
+
+/* ══════════════════ LAYOUT ══════════════════ */
+main{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:0 22px 100px}
+.screen{display:none;animation:fadeUp .45s var(--pop)}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+.sec-title{
+  font-family:var(--font-pixel);font-size:18px;margin:44px 0 6px;
+  display:flex;align-items:center;gap:12px;
+}
+.sec-title::after{content:"";flex:1;height:5px;border-radius:99px;background:repeating-linear-gradient(90deg,var(--bubblegum) 0 14px,var(--sunbeam) 14px 28px,var(--mint) 28px 42px)}
+.sec-sub{color:var(--ink-soft);font-weight:700;margin-bottom:22px}
+
+/* ══════════════════ ANIMATED TITLE ══════════════════ */
+.hero{text-align:center;padding:44px 0 10px;position:relative}
+.jp{font-family:var(--font-stat);font-size:19px;color:var(--grape);letter-spacing:9px;margin-bottom:14px;animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.55;letter-spacing:9px}50%{opacity:1;letter-spacing:13px}}
+.title{font-family:var(--font-pixel);font-size:clamp(26px,6.6vw,62px);line-height:1;display:flex;justify-content:center;flex-wrap:wrap;gap:.06em}
+.title span{
+  display:inline-block;animation:letterhop 2.6s var(--pop) infinite;
+  text-shadow:0 5px 0 var(--ink),0 9px 0 rgba(43,27,74,.24);
+}
+@keyframes letterhop{0%,62%,100%{transform:translateY(0) scale(1,1)}70%{transform:translateY(-16px) scale(.9,1.14)}82%{transform:translateY(0) scale(1.14,.88)}90%{transform:translateY(0) scale(1,1)}}
+.title.rainbow span{animation:letterhop 2.6s var(--pop) infinite, hue 3s linear infinite}
+@keyframes hue{to{filter:hue-rotate(360deg)}}
+.subtitle{font-family:var(--font-stat);font-size:clamp(12px,2.1vw,19px);letter-spacing:5px;color:var(--ink-soft);margin-top:20px;min-height:1.4em}
+.subtitle .caret{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.goo{display:block;margin:0 auto;margin-top:-6px}
+
+/* ══════════════════ TODAY'S BLOOM ══════════════════ */
+.today-wrap{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:44px;align-items:center;margin-top:36px}
+@media(max-width:900px){.today-wrap{grid-template-columns:1fr;gap:30px}}
+
+.ribbon{
+  display:inline-flex;align-items:center;gap:10px;font-family:var(--font-pixel);font-size:12px;
+  background:var(--coral);color:#fff;padding:11px 20px;border:var(--border);border-radius:999px;
+  box-shadow:0 5px 0 var(--ink);transform:rotate(-2deg);margin-bottom:18px;
+}
+.countdown{
+  display:inline-flex;gap:8px;align-items:center;font-family:var(--font-stat);font-size:15px;
+  background:var(--paper);border:3px solid var(--ink);border-radius:999px;padding:8px 18px;
+  box-shadow:0 4px 0 var(--ink);margin-left:10px;
+}
+.countdown b{font-size:19px;color:var(--coral)}
+
+/* card flip */
+.flipstage{perspective:1600px;width:100%;max-width:420px;margin:0 auto;aspect-ratio:1024/1536}
+.flipper{position:relative;width:100%;height:100%;transition:transform 1s var(--pop);transform-style:preserve-3d;cursor:pointer}
+.flipstage.revealed .flipper{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:var(--radius);overflow:hidden}
+.face.front{
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255,255,255,.30), transparent 58%),
+    repeating-linear-gradient(45deg,#6C4FD6 0 16px,#7B5CE6 16px 32px);
+  border:6px solid var(--ink);display:grid;place-items:center;
+  box-shadow:var(--shadow-card);animation:breathe 2.8s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-12px) scale(1.02)}}
+.face.front .qm{font-family:var(--font-pixel);font-size:74px;color:#fff;text-shadow:0 7px 0 rgba(0,0,0,.32);animation:squish 2s var(--pop) infinite}
+.face.front .hint{position:absolute;bottom:26px;font-family:var(--font-stat);font-size:14px;color:#fff;letter-spacing:2px;opacity:.9;animation:pulse 2s infinite}
+.face.front .seal{position:absolute;top:22px;font-family:var(--font-pixel);font-size:10px;color:#FFD86B;letter-spacing:2px}
+.face.back{transform:rotateY(180deg);background:transparent}
+.face.back img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 14px 26px rgba(43,27,74,.34))}
+.flipstage.revealed .face.back{animation:popin .7s var(--pop)}
+@keyframes popin{0%{transform:rotateY(180deg) scale(.86)}60%{transform:rotateY(180deg) scale(1.05)}100%{transform:rotateY(180deg) scale(1)}}
+
+.today-info h2{font-family:var(--font-pixel);font-size:clamp(20px,3.6vw,34px);line-height:1.35;margin-bottom:10px}
+.chips{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0 20px}
+.chip{
+  font-family:var(--font-stat);font-size:14px;padding:7px 15px;border-radius:999px;
+  border:3px solid var(--ink);background:var(--paper);box-shadow:0 3px 0 var(--ink);font-weight:700;
+}
+.chip.type{background:var(--bubblegum);color:#fff}
+.chip.rar{background:var(--r-epic);color:#fff}
+.chip.lv{background:var(--sunbeam)}
+.quote{
+  font-style:italic;font-weight:700;color:var(--ink-soft);border-left:6px solid var(--mint);
+  padding:6px 0 6px 16px;margin:18px 0;
+}
+
+/* stat bars */
+.stats{display:grid;gap:12px;margin-top:22px}
+.stat{display:grid;grid-template-columns:104px 1fr 44px;align-items:center;gap:12px}
+.stat .lbl{font-family:var(--font-stat);font-size:14px;letter-spacing:1px}
+.stat .track{height:20px;background:color-mix(in srgb,var(--ink) 12%,transparent);border:3px solid var(--ink);border-radius:999px;overflow:hidden}
+.stat .fill{height:100%;width:0;border-radius:999px;transition:width 1.1s var(--pop)}
+.stat .val{font-family:var(--font-pixel);font-size:13px;text-align:right}
+.f-str{background:repeating-linear-gradient(90deg,#FF7A59 0 10px,#FF9878 10px 20px)}
+.f-end{background:repeating-linear-gradient(90deg,#7FE3C0 0 10px,#9CEDD3 10px 20px)}
+.f-agi{background:repeating-linear-gradient(90deg,#8FD3FF 0 10px,#B4E2FF 10px 20px)}
+.f-hap{background:repeating-linear-gradient(90deg,#FF8FC5 0 10px,#FFB0D6 10px 20px)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:10px;font-family:var(--font-pixel);font-size:12px;
+  padding:15px 24px;border:var(--border);border-radius:16px;background:var(--sunbeam);
+  box-shadow:0 6px 0 var(--ink);transition:.14s var(--pop);
+}
+.btn:hover{transform:translateY(-3px);box-shadow:0 9px 0 var(--ink)}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.btn.pink{background:var(--bubblegum);color:#fff}
+.btn.mint{background:var(--mint)}
+.btn.ghost{background:var(--paper)}
+
+/* ══════════════════ SLIMEDEX ══════════════════ */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:26px}
+.filter{
+  font-family:var(--font-stat);font-size:13px;padding:9px 16px;border-radius:999px;
+  border:3px solid var(--ink);background:var(--paper);box-shadow:0 3px 0 var(--ink);transition:.14s var(--pop)
+}
+.filter:hover{transform:translateY(-2px)}
+.filter.on{background:var(--ink);color:var(--paper)}
+.search{
+  margin-left:auto;font-family:var(--font-round);font-weight:700;font-size:15px;
+  padding:11px 18px;border-radius:999px;border:3px solid var(--ink);background:var(--paper);
+  box-shadow:0 3px 0 var(--ink);color:var(--ink);min-width:210px;
+}
+.search::placeholder{color:var(--ink-soft)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:24px}
+.tile{
+  position:relative;border-radius:20px;border:var(--border);background:var(--paper);
+  box-shadow:var(--shadow-card);overflow:hidden;cursor:pointer;
+  transition:transform .22s var(--pop),box-shadow .22s var(--pop);
+  animation:bobin .6s var(--pop) backwards;
+}
+@keyframes bobin{from{opacity:0;transform:translateY(26px) scale(.94)}to{opacity:1;transform:none}}
+.tile:hover{transform:translateY(-10px) rotate(-1.2deg) scale(1.03);box-shadow:0 18px 0 rgba(43,27,74,.14),0 26px 50px rgba(43,27,74,.28)}
+.tile .art{aspect-ratio:3/4;display:grid;place-items:center;position:relative;overflow:hidden;padding:6px;
+  background:repeating-conic-gradient(from 45deg,color-mix(in srgb,var(--sky) 22%,var(--paper)) 0% 25%,var(--paper) 0% 50%) 0/26px 26px}
+.tile .art img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 5px 9px rgba(43,27,74,.3))}
+.tile .art svg{width:72%;animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-11px) rotate(2deg)}}
+.tile .meta{padding:12px 14px;border-top:4px solid var(--ink);background:var(--paper)}
+.tile .nm{font-family:var(--font-pixel);font-size:11px;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .row{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-stat);font-size:12px;color:var(--ink-soft)}
+.tile .serial{position:absolute;top:9px;left:9px;font-family:var(--font-stat);font-size:11px;background:rgba(43,27,74,.82);color:#fff;padding:4px 9px;border-radius:999px;z-index:2}
+.rar-tag{padding:3px 9px;border-radius:999px;color:#fff;font-weight:700;font-size:11px}
+.tile.locked .art{background:repeating-linear-gradient(45deg,#3A2C5E 0 12px,#463672 12px 24px)}
+.tile.locked .art svg{filter:brightness(0) opacity(.42)}
+.tile.locked .nm{color:var(--ink-soft)}
+.tile .holo{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.62) 45%,rgba(255,143,197,.42) 52%,transparent 68%);
+  background-size:220% 220%}
+.tile:hover .holo{opacity:1;animation:sweep 1.3s linear infinite}
+@keyframes sweep{from{background-position:190% 0}to{background-position:-90% 0}}
+.tile.new::after{
+  content:"NEW!";position:absolute;top:9px;right:9px;z-index:2;font-family:var(--font-pixel);font-size:9px;
+  background:var(--coral);color:#fff;padding:5px 8px;border-radius:8px;border:2px solid var(--ink);
+  animation:squish 1.4s var(--pop) infinite;
+}
+
+/* ══════════════════ MODAL / PROFILE ══════════════════ */
+.modal{position:fixed;inset:0;z-index:120;display:none;place-items:center;padding:22px;
+  background:rgba(43,27,74,.68);backdrop-filter:blur(7px)}
+.modal.open{display:grid;animation:fadeUp .3s var(--pop)}
+.sheet{
+  width:min(980px,100%);max-height:88vh;overflow:auto;background:var(--paper);
+  border:var(--border);border-radius:26px;box-shadow:0 20px 0 rgba(0,0,0,.28);padding:30px;
+  display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:30px;
+}
+@media(max-width:820px){.sheet{grid-template-columns:1fr;padding:20px}}
+.sheet .close{position:absolute;top:26px;right:28px;font-size:26px;width:46px;height:46px;border-radius:14px;
+  border:3px solid var(--ink);background:var(--coral);color:#fff;box-shadow:0 4px 0 var(--ink)}
+.holo-card{border-radius:18px;overflow:hidden;transition:transform .12s ease-out;transform-style:preserve-3d}
+.holo-card img{width:100%}
+
+.panel{border:3px solid var(--ink);border-radius:16px;padding:16px;background:color-mix(in srgb,var(--sky) 16%,var(--paper));margin-top:18px}
+.panel h4{font-family:var(--font-pixel);font-size:11px;margin-bottom:11px;display:flex;gap:8px;align-items:center}
+.bytes{
+  font-family:var(--font-stat);font-size:12.5px;line-height:1.6;word-break:break-all;
+  background:var(--ink);color:#8CF5C9;padding:13px;border-radius:11px;
+}
+.bytes .hd{color:var(--sunbeam)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;font-size:14px;font-weight:700}
+.kv dt{font-family:var(--font-stat);color:var(--ink-soft);font-size:13px}
+.badge-chain{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-stat);font-size:13px;
+  background:linear-gradient(90deg,var(--grape),var(--bubblegum));color:#fff;padding:8px 15px;border-radius:999px;
+  border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
+
+/* ══════════════════ PUNI LAB ══════════════════ */
+.cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:22px}
+.info{border:var(--border);border-radius:20px;padding:22px;background:var(--paper);box-shadow:0 8px 0 rgba(43,27,74,.13)}
+.info h3{font-family:var(--font-pixel);font-size:13px;margin-bottom:12px}
+.info p{color:var(--ink-soft);font-weight:600;line-height:1.65}
+.rar-list{display:grid;gap:11px;margin-top:8px}
+.rar-row{display:grid;grid-template-columns:34px 1fr auto;gap:14px;align-items:center;
+  border:3px solid var(--ink);border-radius:14px;padding:11px 15px;background:var(--paper);
+  transition:.16s var(--pop)}
+.rar-row:hover{transform:translateX(8px)}
+.swatch{width:26px;height:26px;border-radius:8px;border:3px solid var(--ink)}
+.rar-row .nm{font-family:var(--font-pixel);font-size:11px}
+.rar-row .pc{font-family:var(--font-stat);font-size:15px;color:var(--ink-soft)}
+.typegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-top:6px}
+.typepill{font-family:var(--font-stat);font-size:13px;text-align:center;padding:11px 6px;border-radius:12px;
+  border:3px solid var(--ink);color:#fff;box-shadow:0 3px 0 var(--ink);transition:.15s var(--pop)}
+.typepill:hover{transform:translateY(-4px) rotate(-2deg)}
+
+/* ══════════════════ SMILE BANK ══════════════════ */
+.bank{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start}
+@media(max-width:860px){.bank{grid-template-columns:1fr}}
+.coin{width:150px;height:150px;margin:0 auto 20px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#FFF0B8,#FFD86B 46%,#E0A82E);
+  border:6px solid var(--ink);display:grid;place-items:center;
+  font-family:var(--font-pixel);font-size:26px;color:#7A5410;
+  box-shadow:0 10px 0 rgba(43,27,74,.3);animation:spincoin 5s var(--pop) infinite}
+@keyframes spincoin{0%,72%,100%{transform:rotateY(0)}86%{transform:rotateY(180deg)}}
+.balance{font-family:var(--font-pixel);font-size:34px;text-align:center}
+.soon{display:inline-block;font-family:var(--font-stat);font-size:12px;background:var(--grape);color:#fff;
+  padding:5px 12px;border-radius:999px;border:2px solid var(--ink);margin-left:10px;vertical-align:middle}
+.tx{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:13px 0;border-bottom:3px dotted color-mix(in srgb,var(--ink) 26%,transparent)}
+.tx .h{font-family:var(--font-stat);font-size:12px;color:var(--ink-soft);word-break:break-all}
+.tx .amt{font-family:var(--font-pixel);font-size:12px;color:var(--mint)}
+.flowline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.flowline span{font-family:var(--font-stat);font-size:13px;padding:9px 14px;border-radius:12px;
+  border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
+.fl-a{background:var(--sunbeam)}
+.fl-b{background:var(--coral);color:#fff}
+.fl-op{border:none!important;box-shadow:none!important;font-family:var(--font-pixel)!important;font-size:12px!important;color:var(--ink-soft)}
+.fl-note{font-size:13px;color:var(--ink-soft);font-weight:700;margin-top:8px}
+
+/* ══════════════════ MISC ══════════════════ */
+footer{position:relative;z-index:1;border-top:var(--border);background:var(--paper);padding:26px 22px;text-align:center;overflow:hidden}
+footer .walk{width:56px;animation:walk 16s linear infinite;position:absolute;bottom:14px;left:-70px}
+@keyframes walk{0%{left:-70px;transform:scaleX(1)}49%{left:100%;transform:scaleX(1)}50%{left:100%;transform:scaleX(-1)}99%{left:-70px;transform:scaleX(-1)}100%{left:-70px;transform:scaleX(1)}}
+footer small{font-family:var(--font-stat);font-size:13px;color:var(--ink-soft)}
+.note{
+  border:3px dashed var(--grape);border-radius:16px;padding:15px 18px;margin:26px 0;
+  background:color-mix(in srgb,var(--grape) 9%,transparent);font-weight:700;color:var(--ink-soft);font-size:14px;
+}
+.note b{color:var(--ink)}
+#confetti{position:fixed;inset:0;z-index:200;pointer-events:none}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(140px);z-index:300;
+  background:var(--ink);color:var(--paper);font-family:var(--font-stat);font-size:14px;
+  padding:14px 24px;border-radius:999px;transition:transform .4s var(--pop)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div id="bgslimes"></div>
+<canvas id="confetti"></canvas>
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<header class="nav">
+  <div class="nav-in">
+    <div class="brand"><span class="dot" id="brandSlime"></span>PIXELSLIME</div>
+    <nav class="links">
+      <button class="on" data-go="home">TODAY'S BLOOM</button>
+      <button data-go="dex">SLIMEDEX</button>
+      <button data-go="lab">PUNI LAB</button>
+      <button data-go="bank">SMILE BANK</button>
+    </nav>
+    <button class="iconbtn" id="themeBtn" title="Moonlit Puniverse">🌙</button>
+    <button class="keeper" onclick="toast('Optional — phase 2. The gallery is public and needs no login. 🫧')">
+      <span class="av">🫧</span>CONNECT WALLET
+    </button>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══════════════ SCREEN: HOME ═══════════════ -->
+<section class="screen active" id="home">
+
+  <div class="hero">
+    <div class="jp">✦ ぷにぷに ✦</div>
+    <h1 class="title" id="title"></h1>
+    <div class="subtitle" id="subtitle"></div>
+    <svg class="goo" width="180" height="26" viewBox="0 0 180 26" aria-hidden="true">
+      <path d="M0 8 Q30 0 60 8 T120 8 T180 8 L180 26 L0 26Z" fill="var(--bubblegum)" opacity=".28"/>
+    </svg>
+  </div>
+
+  <div class="note">
+    <b>MOCKUP</b> — static prototype for the plan in <b>docs/PLAN.md</b>. Card art is the real
+    <b>mochibo.png</b> template; other slimes are placeholder sprites. Click the face-down card to reveal.
+  </div>
+
+  <div class="today-wrap">
+    <div>
+      <div class="flipstage" id="flipstage">
+        <div class="flipper">
+          <div class="face front">
+            <div class="seal">✦ PIXEL RAIN ✦</div>
+            <div class="qm">?</div>
+            <div class="hint">CLICK TO REVEAL</div>
+          </div>
+          <div class="face back"><img src="../../assets/template/mochibo.png" alt="Mochibo — PixelSlime card"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="today-info">
+      <div>
+        <span class="ribbon">✦ DAY 1 · 28 JUL 2026 ✦</span>
+        <span class="countdown">NEXT SLIME IN <b id="cd">--:--:--</b></span>
+      </div>
+      <h2>Today's&nbsp;Bloom:<br><span id="todayName" style="color:var(--bubblegum)">? ? ? ? ?</span></h2>
+      <div class="chips" id="todayChips" style="visibility:hidden">
+        <span class="chip type">💗 FAIRY</span>
+        <span class="chip rar">◈ EPIC · AURORA</span>
+        <span class="chip lv">LV. 12</span>
+        <span class="chip">0.28 m</span>
+        <span class="chip">0.9 kg</span>
+      </div>
+      <p id="todayDesc" style="font-weight:700;color:var(--ink-soft);line-height:1.7">
+        A new slime is condensing out of the Pixel Rain. Tap the card to catalogue it in the SLIMEDEX
+        before it drifts away…
+      </p>
+      <div class="quote" id="todayQuote" style="display:none">"Mochi! (Hugs all around!)"</div>
+
+      <div class="stats" id="statBlock" style="visibility:hidden">
+        <div class="stat"><span class="lbl">💪 STRENGTH</span><div class="track"><div class="fill f-str" data-v="28"></div></div><span class="val">28</span></div>
+        <div class="stat"><span class="lbl">🛡 ENDURANCE</span><div class="track"><div class="fill f-end" data-v="55"></div></div><span class="val">55</span></div>
+        <div class="stat"><span class="lbl">🪽 AGILITY</span><div class="track"><div class="fill f-agi" data-v="65"></div></div><span class="val">65</span></div>
+        <div class="stat"><span class="lbl">💖 HAPPINESS</span><div class="track"><div class="fill f-hap" data-v="95"></div></div><span class="val">95</span></div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+        <button class="btn pink" onclick="openCard(1)">◈ VIEW PROFILE</button>
+        <button class="btn ghost" data-go="dex">▦ OPEN SLIMEDEX</button>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec-title">RECENTLY BLOOMED</h2>
+  <p class="sec-sub">The last slimes to fall out of the Rain.</p>
+  <div class="grid" id="recentGrid"></div>
+</section>
+
+<!-- ═══════════════ SCREEN: SLIMEDEX ═══════════════ -->
+<section class="screen" id="dex">
+  <h2 class="sec-title">SLIMEDEX</h2>
+  <p class="sec-sub">Every slime ever catalogued. Silhouettes are slimes you haven't opened yet.</p>
+
+  <div class="toolbar" id="filters">
+    <button class="filter on" data-f="all">ALL</button>
+    <button class="filter" data-f="COMMON">PUDDLE</button>
+    <button class="filter" data-f="UNCOMMON">DEWDROP</button>
+    <button class="filter" data-f="RARE">PRISM</button>
+    <button class="filter" data-f="EPIC">AURORA</button>
+    <button class="filter" data-f="LEGENDARY">STARLIGHT</button>
+    <button class="filter" data-f="MYTHIC">DREAMDROP</button>
+    <input class="search" id="search" placeholder="🔍 search a slime…">
+  </div>
+  <div class="grid" id="dexGrid"></div>
+</section>
+
+<!-- ═══════════════ SCREEN: PUNI LAB ═══════════════ -->
+<section class="screen" id="lab">
+  <h2 class="sec-title">PUNI LAB</h2>
+  <p class="sec-sub">How slimes work, for apprentice Keepers.</p>
+
+  <div class="cards3">
+    <div class="info">
+      <h3>🌧 THE GREAT PIXEL RAIN</h3>
+      <p>A rainbow crashed above the clouds and it rained pixels. Wherever a pixel touched something
+      <b>happy</b>, the thing went soft, wobbled twice, and opened two shiny eyes.</p>
+    </div>
+    <div class="info">
+      <h3>🍵 THEY EAT MOODS</h3>
+      <p>A slime absorbs the <b>atmosphere</b> around it. Nap in a sunbeam, become golden. Grow up in a
+      library, become clever and quiet. Meet a cat, learn to purr.</p>
+    </div>
+    <div class="info">
+      <h3>⏰ ONE PER DAWN</h3>
+      <p>Exactly one slime condenses each day. Keepers must catalogue it before it drifts away —
+      that's why the SLIMEDEX exists.</p>
+    </div>
+  </div>
+
+  <h2 class="sec-title">RARITY TIERS</h2>
+  <p class="sec-sub">Rolled in code with a seeded weighted random — never left to the model. A pity timer
+  forces a ≥ RARE roll if 14 days pass without one.</p>
+  <div class="rar-list" id="rarList"></div>
+
+  <h2 class="sec-title">THE 16 TYPES</h2>
+  <p class="sec-sub">Four bits, sixteen moods.</p>
+  <div class="typegrid" id="typeGrid"></div>
+
+  <h2 class="sec-title">HOW A CARD IS BORN</h2>
+  <div class="cards3">
+    <div class="info"><h3>1 · ROLL</h3><p>Rarity, biome, mood and companion are drawn in code from a seed derived from the date. Reproducible.</p></div>
+    <div class="info"><h3>2 · WRITE</h3><p><b>gpt-5.6-sol</b> writes the card as strict JSON — name, personality, power, stats — length-capped so it fits the byte budget.</p></div>
+    <div class="info"><h3>3 · PAINT</h3><p><b>gpt-image-2</b> paints the card at 1024×1536 with a transparent background, using this very template as the style reference.</p></div>
+    <div class="info"><h3>4 · CHECK</h3><p>A vision model reads the finished card back and verifies every number matches the JSON. Mismatch → repaint.</p></div>
+    <div class="info"><h3>5 · PACK</h3><p>The card is packed into <b>PSC-1</b>: 32-byte header + dictionary-DEFLATE text, Z85-encoded into asmDB rows of 175 bytes.</p></div>
+    <div class="info"><h3>6 · ANCHOR</h3><p>Phase 2 — the packed bytes are hashed and minted on-chain as proof the slime existed exactly like this, on that day.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════════ SCREEN: SMILE BANK ═══════════════ -->
+<section class="screen" id="bank">
+  <h2 class="sec-title">SMILE BANK <span class="soon">PHASE 2</span></h2>
+  <p class="sec-sub">Happiness cannot be created by decree. It has to be felt first.</p>
+
+  <div class="bank">
+    <div class="info">
+      <h3>🌧 THE GENESIS RAIN</h3>
+      <p style="margin-bottom:16px">Before the first slime ever bloomed, the Great Pixel Rain left one
+      <b>finite puddle</b> of happiness. Every slime that condenses out of the sky spends a little of it —
+      and it is <b>never refilled</b>.</p>
+      <div class="coin">$</div>
+      <div class="balance" id="genesisLeft">998,400</div>
+      <p style="text-align:center;font-family:var(--font-stat);font-size:13px;color:var(--ink-soft);margin-top:6px">
+        $SMILE REMAINING · <b id="bloomsLeft">9,984</b> SLIMES LEFT · ~27 YEARS</p>
+      <div class="stat" style="margin-top:20px;grid-template-columns:1fr">
+        <div class="track"><div class="fill f-hap" style="width:99.8%"></div></div>
+      </div>
+    </div>
+
+    <div class="info">
+      <h3>♻️ HOW A SLIME IS PAID FOR</h3>
+      <p style="margin-bottom:14px">The fee is only real if the payer and the earner are
+      <b>different</b>, and if the payer's purse is <b>finite</b>. So:</p>
+      <div class="flowline"><span class="fl-a">GENESIS RAIN</span><span class="fl-op">−100</span>
+        <span class="fl-b">🔥 BURNED</span></div>
+      <p class="fl-note">Publishing today's slime destroys 100 $SMILE from a purse that can never be refilled.</p>
+      <div class="flowline"><span class="fl-a" style="background:var(--mint)">TODAY'S SLIME</span>
+        <span class="fl-op">+248</span><span class="fl-b" style="background:var(--sky);color:var(--ink)">CLAIM POOL</span></div>
+      <p class="fl-note">Its happiness × rarity mints new $SMILE — into a pool the Treasury <b>cannot spend</b>.</p>
+      <div class="flowline"><span class="fl-a" style="background:var(--sky);color:var(--ink)">CLAIM POOL</span>
+        <span class="fl-op">→</span><span class="fl-b" style="background:var(--bubblegum)">YOU</span></div>
+      <p class="fl-note">Connect a wallet if you want to claim. The gallery itself stays public and free.</p>
+    </div>
+  </div>
+
+  <h2 class="sec-title">ADOPT A SLIME <span class="soon">PHASE 3</span></h2>
+  <p class="sec-sub">Every daily card is minted into the SLIMEDEX Vault. Spend $SMILE to bring one home —
+  that burn is what finally gives the token something to be <i>for</i>.</p>
+  <div class="rar-list" id="adoptList"></div>
+
+  <div class="cards3" style="margin-top:26px">
+    <div class="info"><h3>⛓ WHAT IS ACTUALLY ON-CHAIN</h3>
+      <p>Not the picture, and not the JSON. The <b>175 packed PSC-1 bytes</b>, hashed with keccak256 into an
+      ERC-721. The chain proves the slime existed exactly like that, on that day — without duplicating a
+      single byte of it.</p></div>
+    <div class="info"><h3>🔐 WHO SIGNS</h3>
+      <p>An <b>Azure Key Vault secp256k1</b> key. Non-exportable, signed through the HSM with a managed
+      identity. The private key exists nowhere in the code, the env or the logs.</p></div>
+    <div class="info"><h3>🧪 WHERE</h3>
+      <p><b>Polygon Amoy</b> testnet first — free faucet gas, so the whole loop can run for as long as we
+      like before anyone decides whether real money is ever involved.</p></div>
+  </div>
+
+  <h2 class="sec-title">RECENT ANCHORS</h2>
+  <div class="info">
+    <div class="tx"><span>🫧</span><span class="h">PS-0001 · Mochibo · EPIC · 0x7f3a…c41e</span><span class="amt">+760</span></div>
+    <div class="tx"><span>🫧</span><span class="h">PS-0002 · Fernwick · COMMON · 0x91bd…07aa</span><span class="amt">+72</span></div>
+    <div class="tx"><span>🫧</span><span class="h">PS-0003 · Blorbit · LEGENDARY · 0x2c58…9f30</span><span class="amt">+1800</span></div>
+    <div class="tx" style="border:none"><span>⏳</span><span class="h">PS-0004 · pending…</span><span class="amt">—</span></div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════ MODAL ═══════════════ -->
+<div class="modal" id="modal">
+  <div class="sheet" style="position:relative">
+    <button class="close" onclick="closeCard()">×</button>
+    <div>
+      <div class="holo-card" id="holoCard"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+        <span class="badge-chain">⛓️ ON-CHAIN</span>
+        <span class="chip" id="mSerial">PS-0001</span>
+      </div>
+    </div>
+    <div>
+      <h2 style="font-family:var(--font-pixel);font-size:22px" id="mName">Mochibo</h2>
+      <div class="chips" id="mChips"></div>
+      <div class="quote" id="mQuote"></div>
+      <dl class="kv" id="mKv"></dl>
+      <div class="stats" id="mStats" style="margin-top:20px"></div>
+
+      <div class="panel">
+        <h4>📦 PROVENANCE — THE 175 BYTES</h4>
+        <p style="font-size:13px;color:var(--ink-soft);font-weight:700;margin-bottom:10px">
+          This card, packed as <b>PSC-1</b> and Z85-encoded, exactly as it lives in <b>smilesdb</b>.
+        </p>
+        <div class="bytes" id="mBytes"></div>
+        <p style="font-size:12.5px;color:var(--ink-soft);font-weight:700;margin-top:10px" id="mByteInfo"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="walk" id="walker"></span>
+  <small>PIXELSLIME · PUNIPUNI PARADISE — mockup · one slime per dawn · made with 🫧 in the Puniverse</small>
+</footer>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   PIXEL SLIME SPRITE  —  procedural 16×12 pixel-art slime
+   ══════════════════════════════════════════════════════════════════ */
+const BODY=[[5,10],[3,12],[2,13],[1,14],[1,14],[0,15],[0,15],[0,15],[0,15],[0,15],[0,15],[0,15]];
+const ACC={
+  flower:[[6,0,'#FFF3F7'],[7,0,'#FFF3F7'],[5,1,'#FFF3F7'],[8,1,'#FFF3F7'],[6,1,'#FFD86B'],[7,1,'#FFD86B'],[9,1,'#7FE3C0'],[10,2,'#7FE3C0']],
+  leaf:[[7,0,'#6BC98A'],[8,0,'#6BC98A'],[8,1,'#4FA96C'],[9,1,'#6BC98A']],
+  star:[[7,0,'#FFD86B'],[6,1,'#FFD86B'],[7,1,'#FFF0B8'],[8,1,'#FFD86B']],
+  horn:[[6,0,'#FFFFFF'],[7,0,'#E7DCFF'],[6,1,'#E7DCFF'],[7,1,'#FFFFFF']],
+  none:[]
+};
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt;
+  const c=v=>Math.max(0,Math.min(255,v));
+  return '#'+((c(r)<<16)|(c(g)<<8)|c(b)).toString(16).padStart(6,'0');
+}
+function slimeSVG(base,acc='none',face='happy',size=null){
+  const light=shade(base,52), dark=shade(base,-46), px=[];
+  const R=(x,y,f,o=1)=>px.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${f}"${o<1?` opacity="${o}"`:''}/>`);
+  BODY.forEach(([a,b],y)=>{ for(let x=a;x<=b;x++) R(x,y,base); });
+  // top-left shine
+  [[4,1],[5,1],[4,2],[5,2],[6,2],[3,3],[4,3],[5,3]].forEach(([x,y])=>R(x,y,light));
+  // bottom shadow
+  for(let x=0;x<=15;x++){R(x,11,dark);} for(let x=1;x<=14;x++){R(x,10,dark,.42);}
+  // eyes
+  const EY=5;
+  [[4],[10]].forEach(([ex])=>{
+    for(let y=EY;y<EY+3;y++){R(ex,y,'#2B1B4A');R(ex+1,y,'#2B1B4A');}
+    R(ex,EY,'#FFFFFF');
+  });
+  // blush
+  [[2,7],[3,7],[12,7],[13,7]].forEach(([x,y])=>R(x,y,'#FF8FC5',.85));
+  // mouth
+  if(face==='happy'){R(7,8,'#2B1B4A');R(8,8,'#2B1B4A');R(7,9,'#FF6FA5');R(8,9,'#FF6FA5');}
+  else if(face==='smug'){R(6,8,'#2B1B4A');R(7,9,'#2B1B4A');R(8,9,'#2B1B4A');R(9,8,'#2B1B4A');}
+  else {R(7,8,'#2B1B4A');R(8,8,'#2B1B4A');}
+  (ACC[acc]||[]).forEach(([x,y,f])=>R(x,y,f));
+  return `<svg viewBox="0 0 16 12" ${size?`width="${size}"`:''} shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${px.join('')}</svg>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MOCK DATA  —  shaped exactly like contracts/card.schema.json
+   ══════════════════════════════════════════════════════════════════ */
+const RARITY={
+  COMMON   :{house:'Puddle',   c:'#9FB4C7', w:'45 %'},
+  UNCOMMON :{house:'Dewdrop',  c:'#7FE3C0', w:'27 %'},
+  RARE     :{house:'Prism',    c:'#8FD3FF', w:'17 %'},
+  EPIC     :{house:'Aurora',   c:'#C08BFF', w:'8 %'},
+  LEGENDARY:{house:'Starlight',c:'#FFD86B', w:'2.5 %'},
+  MYTHIC   :{house:'Dreamdrop',c:'#FF8FC5', w:'0.5 %'}
+};
+const TYPES={FAIRY:'#FF8FC5',FOREST:'#6BC98A',WATER:'#5FB8E8',EMBER:'#FF7A59',STORM:'#8B6FE8',STONE:'#A08B7A',
+  SUGAR:'#FFB3D9',GHOST:'#B0A8D8',METAL:'#93A4B5',COSMIC:'#6B5BD6',BLOOM:'#FF9EBB',FROST:'#9FE0F0',
+  SLUDGE:'#8FA860',BEAM:'#FFD86B',PAPER:'#E8D9B8',DREAM:'#C08BFF'};
+
+const CARDS=[
+ {serial:1,name:'Mochibo',level:12,rarity:'EPIC',type:'FAIRY',h:280,w:900,str:28,end:55,agi:65,hap:95,
+  personality:'Sweet and cuddly. Loves cozy places and spreading joy!',
+  power:'Sugar Squish',powerDesc:'Covers the area in sweet goo, healing allies over time.',
+  quote:'Mochi! (Hugs all around!)',biome:'Cozy Reading Room',companion:'Sleepy Puff Cat',
+  date:'28 Jul 2026',img:'../../assets/template/mochibo.png',color:'#FF9EC4',acc:'flower',face:'happy',owned:true,isNew:true},
+
+ {serial:2,name:'Fernwick',level:8,rarity:'COMMON',type:'FOREST',h:210,w:640,str:34,end:48,agi:39,hap:72,
+  personality:'Quiet and patient. Naps under ferns and hums to beetles.',
+  power:'Moss Hug',powerDesc:'Wraps a friend in warm moss, blocking the next hit.',
+  quote:'Puni… (five more minutes)',biome:'Rainy Fern Hollow',companion:'Snail Buddy',
+  date:'27 Jul 2026',color:'#7FCB93',acc:'leaf',face:'sleepy',owned:true},
+
+ {serial:3,name:'Blorbit',level:19,rarity:'LEGENDARY',type:'COSMIC',h:340,w:1180,str:61,end:70,agi:88,hap:90,
+  personality:'Dreamy stargazer. Hums the sound of a distant satellite.',
+  power:'Orbit Drop',powerDesc:'Calls a tiny meteor of pure glitter onto the field.',
+  quote:'Blorb! (I saw the whole sky!)',biome:'Rooftop Observatory',companion:'Comet Moth',
+  date:'26 Jul 2026',color:'#7C6BE0',acc:'star',face:'happy',owned:true},
+
+ {serial:4,name:'Puddington',level:5,rarity:'UNCOMMON',type:'WATER',h:190,w:520,str:18,end:41,agi:57,hap:84,
+  personality:'Polite little puddle. Apologises for being damp.',
+  power:'Splish Bow',powerDesc:'A courteous splash that slows everyone nearby.',
+  quote:'Plip! (Terribly sorry.)',biome:'Rainy Bus Stop',companion:'Paper Boat',
+  date:'25 Jul 2026',color:'#63BEEA',acc:'none',face:'happy',owned:true},
+
+ {serial:5,name:'Kinaco',level:14,rarity:'RARE',type:'SUGAR',h:250,w:810,str:31,end:52,agi:60,hap:91,
+  personality:'Smells of toasted soybean flour. Extremely proud of it.',
+  power:'Dust Bloom',powerDesc:'A sweet cloud that makes opponents sneeze politely.',
+  quote:'Kina! (Taste the sunshine!)',biome:'Old Sweet Shop',companion:'Tea Whisk',
+  date:'24 Jul 2026',color:'#F3C98B',acc:'none',face:'smug',owned:true},
+
+ {serial:6,name:'Ashmallow',level:11,rarity:'RARE',type:'EMBER',h:230,w:700,str:52,end:44,agi:47,hap:66,
+  personality:'Warm, slightly singed, always a little too close to the fire.',
+  power:'Toast Puff',powerDesc:'Puffs up golden-brown and radiates cosy heat.',
+  quote:'Fwoosh! (Perfectly toasted.)',biome:'Campfire at Dusk',companion:'Ember Moth',
+  date:'23 Jul 2026',color:'#FF9264',acc:'none',face:'happy',owned:true},
+
+ {serial:7,name:'Nibblewisp',level:16,rarity:'EPIC',type:'GHOST',h:270,w:430,str:24,end:38,agi:93,hap:58,
+  personality:'Shy haunting. Steals biscuits, always leaves a thank-you note.',
+  power:'Crumb Fade',powerDesc:'Vanishes into crumbs, reappearing behind the target.',
+  quote:'…hi. (sorry about the biscuits)',biome:'Attic at Midnight',companion:'Dust Bunny',
+  date:'22 Jul 2026',color:'#B6ADE2',acc:'horn',face:'sleepy',owned:false},
+
+ {serial:8,name:'Glimmerpuff',level:22,rarity:'MYTHIC',type:'DREAM',h:310,w:660,str:44,end:63,agi:79,hap:99,
+  personality:'A dream that got lost on the way to someone. Very apologetic.',
+  power:'Lullabloom',powerDesc:'Everyone nearby takes a short, extremely good nap.',
+  quote:'Shhh… (you are almost there)',biome:'Between Two Dreams',companion:'Firefly Choir',
+  date:'21 Jul 2026',color:'#FFA8DE',acc:'star',face:'happy',owned:false},
+
+ {serial:9,name:'Cobblenop',level:7,rarity:'COMMON',type:'STONE',h:200,w:1500,str:58,end:77,agi:14,hap:61,
+  personality:'Heavy, dependable, absolutely refuses to hurry.',
+  power:'Sit Down',powerDesc:'Sits. Nothing moves it. That is the whole move.',
+  quote:'…nope. (I live here now)',biome:'Garden Wall',companion:'Lichen Patch',
+  date:'20 Jul 2026',color:'#A79684',acc:'none',face:'smug',owned:false},
+
+ {serial:10,name:'Zapkin',level:13,rarity:'UNCOMMON',type:'STORM',h:240,w:590,str:47,end:40,agi:81,hap:74,
+  personality:'Overcaffeinated cloudlet. Vibrates when excited, which is always.',
+  power:'Static Boop',powerDesc:'A tiny shock that makes everyone\u2019s hair stand up.',
+  quote:'BZZT! (did you feel that?!)',biome:'Laundry Line in a Gale',companion:'Kite Scrap',
+  date:'19 Jul 2026',color:'#9B87F0',acc:'none',face:'happy',owned:false},
+
+ {serial:11,name:'Origamew',level:9,rarity:'RARE',type:'PAPER',h:220,w:120,str:21,end:29,agi:86,hap:80,
+  personality:'Folds itself into whatever shape the moment requires.',
+  power:'Crease Step',powerDesc:'Folds flat, slips through the gap, unfolds behind you.',
+  quote:'Kami! (fold me again!)',biome:'Stationery Drawer',companion:'Paper Crane',
+  date:'18 Jul 2026',color:'#EFDFBE',acc:'none',face:'happy',owned:false},
+
+ {serial:12,name:'Frostbun',level:15,rarity:'EPIC',type:'FROST',h:260,w:880,str:36,end:68,agi:55,hap:87,
+  personality:'Cold on the outside, suspiciously warm in the middle.',
+  power:'Snow Nap',powerDesc:'Freezes the ground into a soft, extremely comfy drift.',
+  quote:'Fuwa! (still warm inside!)',biome:'First Snow Morning',companion:'Mitten Sprite',
+  date:'17 Jul 2026',color:'#A9E4F2',acc:'none',face:'happy',owned:false}
+];
+
+/* ══════════════ Z85 alphabet — illustrative payload rendering ══════ */
+const Z85='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#';
+function fakeZ85(seed,len){
+  let s='',x=seed*2654435761%4294967296;
+  for(let i=0;i<len;i++){x=(x*1103515245+12345)%2147483648;s+=Z85[x%85];}
+  return s;
+}
+
+/* ══════════════════ TITLE ANIMATION ══════════════════ */
+const TITLE='PIXELSLIME';
+document.getElementById('title').innerHTML=[...TITLE].map((ch,i)=>{
+  const pal=['#FF8FC5','#FFD86B','#7FE3C0','#8FD3FF','#8B6FE8','#FF7A59'];
+  return `<span style="color:${pal[i%pal.length]};animation-delay:${i*.08}s">${ch}</span>`;
+}).join('');
+
+const SUB='PUNIPUNI PARADISE';
+let si=0;const subEl=document.getElementById('subtitle');
+(function type(){
+  subEl.innerHTML=SUB.slice(0,si)+'<span class="caret">▌</span>';
+  if(si++<SUB.length) setTimeout(type,95); else setTimeout(()=>{si=0;type();},4200);
+})();
+
+document.getElementById('brandSlime').innerHTML=slimeSVG('#FF9EC4','flower','happy');
+document.getElementById('walker').innerHTML=slimeSVG('#7FE3C0','leaf','happy');
+
+/* ══════════════════ BACKGROUND SLIMES ══════════════════ */
+(function bg(){
+  const box=document.getElementById('bgslimes');
+  const cols=['#FF8FC5','#7FE3C0','#8FD3FF','#8B6FE8','#FFD86B','#FF7A59'];
+  for(let i=0;i<14;i++){
+    const d=document.createElement('div');
+    d.className='drift';
+    d.style.left=Math.random()*100+'%';
+    d.style.top=Math.random()*120+'%';
+    d.style.width=(28+Math.random()*54)+'px';
+    d.style.animationDuration=(16+Math.random()*22)+'s';
+    d.style.animationDelay=(-Math.random()*22)+'s';
+    d.innerHTML=slimeSVG(cols[i%cols.length],'none','happy');
+    box.appendChild(d);
+  }
+})();
+
+/* ══════════════════ ROUTER ══════════════════ */
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+  document.querySelectorAll('nav.links button').forEach(b=>b.classList.toggle('on',b.dataset.go===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]'); if(b) go(b.dataset.go);});
+
+/* ══════════════════ TILES ══════════════════ */
+function tile(c,i){
+  const r=RARITY[c.rarity];
+  const locked=!c.owned;
+  const art=c.img
+    ? `<img src="${c.img}" alt="${c.name}">`
+    : `<div style="width:100%;height:100%;display:grid;place-items:center;background:
+         radial-gradient(circle at 50% 62%, ${r.c}55, transparent 66%),
+         linear-gradient(160deg, ${shadeJS(c.color,40)}, ${shadeJS(c.color,-24)})">
+         ${slimeSVG(c.color,c.acc,c.face)}</div>`;
+  return `<article class="tile ${locked?'locked':''} ${c.isNew?'new':''}" style="animation-delay:${Math.min(i,8)*.04}s"
+            data-rar="${c.rarity}" data-name="${c.name.toLowerCase()}" onclick="openCard(${c.serial})">
+    <span class="serial">PS-${String(c.serial).padStart(4,'0')}</span>
+    <div class="art">${art}<div class="holo"></div></div>
+    <div class="meta">
+      <div class="nm">${locked?'? ? ? ? ?':c.name}</div>
+      <div class="row">
+        <span style="color:${TYPES[c.type]};font-weight:700">${locked?'???':c.type}</span>
+        <span class="rar-tag" style="background:${r.c};color:#2B1B4A">${r.house.toUpperCase()}</span>
+      </div>
+    </div>
+  </article>`;
+}
+function shadeJS(hex,amt){
+  const n=parseInt(hex.slice(1),16);const c=v=>Math.max(0,Math.min(255,v));
+  return '#'+((c((n>>16)+amt)<<16)|(c(((n>>8)&255)+amt)<<8)|c((n&255)+amt)).toString(16).padStart(6,'0');
+}
+document.getElementById('recentGrid').innerHTML=CARDS.slice(0,6).map(tile).join('');
+document.getElementById('dexGrid').innerHTML=CARDS.map(tile).join('');
+
+/* filters + search */
+let curF='all';
+function applyFilter(){
+  const q=document.getElementById('search').value.trim().toLowerCase();
+  document.querySelectorAll('#dexGrid .tile').forEach(t=>{
+    const okR=curF==='all'||t.dataset.rar===curF;
+    const okQ=!q||t.dataset.name.includes(q);
+    t.style.display=(okR&&okQ)?'':'none';
+  });
+}
+document.getElementById('filters').addEventListener('click',e=>{
+  const b=e.target.closest('.filter'); if(!b)return;
+  document.querySelectorAll('.filter').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); curF=b.dataset.f; applyFilter();
+});
+document.getElementById('search').addEventListener('input',applyFilter);
+
+/* ══════════════════ PUNI LAB CONTENT ══════════════════ */
+document.getElementById('rarList').innerHTML=Object.entries(RARITY).map(([k,v])=>`
+  <div class="rar-row">
+    <span class="swatch" style="background:${v.c}"></span>
+    <span><span class="nm">${v.house.toUpperCase()}</span>
+      <span style="font-family:var(--font-stat);color:var(--ink-soft);margin-left:10px">${k}</span></span>
+    <span class="pc">${v.w}</span>
+  </div>`).join('');
+document.getElementById('typeGrid').innerHTML=Object.entries(TYPES)
+  .map(([t,c])=>`<div class="typepill" style="background:${c}">${t}</div>`).join('');
+
+/* ══════════════════ SMILE BANK — adoption prices ══════════════════ */
+const ADOPT={COMMON:[200,1],UNCOMMON:[400,2],RARE:[900,4],EPIC:[2000,8],LEGENDARY:[6000,20],MYTHIC:[25000,100]};
+document.getElementById('adoptList').innerHTML=Object.entries(ADOPT).map(([k,[price,mult]])=>{
+  const v=RARITY[k];
+  return `<div class="rar-row">
+    <span class="swatch" style="background:${v.c}"></span>
+    <span><span class="nm">${v.house.toUpperCase()}</span>
+      <span style="font-family:var(--font-stat);color:var(--ink-soft);margin-left:10px">yield × ${mult}</span></span>
+    <span class="pc"><b style="color:var(--coral)">${price.toLocaleString()}</b> $SMILE</span>
+  </div>`;
+}).join('');
+
+/* genesis rain ticks down one bloom at a time — it is finite, that is the point */
+(function genesis(){
+  let left=9984;
+  const g=document.getElementById('genesisLeft'), b=document.getElementById('bloomsLeft');
+  if(!g)return;
+  setInterval(()=>{
+    left--; if(left<9900) left=9984;
+    g.textContent=(left*100).toLocaleString();
+    b.textContent=left.toLocaleString();
+  },4000);
+})();
+
+/* ══════════════════ CARD REVEAL ══════════════════ */
+const stage=document.getElementById('flipstage');
+stage.addEventListener('click',()=>{
+  if(stage.classList.contains('revealed'))return;
+  stage.classList.add('revealed');
+  setTimeout(()=>{
+    document.getElementById('todayName').textContent='Mochibo';
+    document.getElementById('todayName').style.color='var(--grape)';
+    document.getElementById('todayChips').style.visibility='visible';
+    document.getElementById('todayQuote').style.display='block';
+    document.getElementById('todayDesc').innerHTML=
+      '<b>Sweet and cuddly.</b> Loves cozy places and spreading joy!<br>'+
+      '<span style="color:var(--coral)">★ POWER · Sugar Squish</span> — covers the area in sweet goo, healing allies over time.';
+    const sb=document.getElementById('statBlock'); sb.style.visibility='visible';
+    sb.querySelectorAll('.fill').forEach((f,i)=>setTimeout(()=>f.style.width=f.dataset.v+'%',i*160));
+    burst(); toast('✦ EPIC · AURORA — Mochibo catalogued! +120 $SMILE');
+  },520);
+});
+
+/* ══════════════════ MODAL ══════════════════ */
+function openCard(serial){
+  const c=CARDS.find(x=>x.serial===serial); if(!c)return;
+  const r=RARITY[c.rarity];
+  document.getElementById('mSerial').textContent='PS-'+String(c.serial).padStart(4,'0');
+  document.getElementById('mName').textContent=c.name;
+  document.getElementById('mQuote').textContent='"'+c.quote+'"';
+  document.getElementById('holoCard').innerHTML=c.img
+    ? `<img src="${c.img}" alt="${c.name}">`
+    : `<div style="aspect-ratio:1024/1536;display:grid;place-items:center;border:6px solid var(--ink);border-radius:18px;
+         background:radial-gradient(circle at 50% 42%, ${r.c}66, transparent 62%),
+         linear-gradient(165deg, ${shadeJS(c.color,44)}, ${shadeJS(c.color,-30)})">
+         <div style="width:72%">${slimeSVG(c.color,c.acc,c.face)}</div></div>`;
+  document.getElementById('mChips').innerHTML=`
+    <span class="chip type" style="background:${TYPES[c.type]}">${c.type}</span>
+    <span class="chip rar" style="background:${r.c};color:#2B1B4A">◈ ${c.rarity} · ${r.house}</span>
+    <span class="chip lv">LV. ${c.level}</span>`;
+  document.getElementById('mKv').innerHTML=`
+    <dt>HEIGHT</dt><dd>${(c.h/1000).toFixed(2)} m</dd>
+    <dt>WEIGHT</dt><dd>${(c.w/1000).toFixed(2)} kg</dd>
+    <dt>BIOME</dt><dd>${c.biome}</dd>
+    <dt>COMPANION</dt><dd>${c.companion}</dd>
+    <dt>POWER</dt><dd><b style="color:var(--coral)">${c.power}</b> — ${c.powerDesc}</dd>
+    <dt>PERSONALITY</dt><dd>${c.personality}</dd>
+    <dt>BLOOMED</dt><dd>${c.date}</dd>`;
+  document.getElementById('mStats').innerHTML=[
+    ['💪 STRENGTH','f-str',c.str],['🛡 ENDURANCE','f-end',c.end],
+    ['🪽 AGILITY','f-agi',c.agi],['💖 HAPPINESS','f-hap',c.hap]
+  ].map(([l,f,v])=>`<div class="stat"><span class="lbl">${l}</span>
+      <div class="track"><div class="fill ${f}" style="width:0" data-v="${v}"></div></div>
+      <span class="val">${v}</span></div>`).join('');
+
+  const payload=fakeZ85(c.serial,140), rows=payload.length>140?2:1;
+  const MON={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  const [dd,mon,yyyy]=c.date.split(' ');
+  const ymd=`${yyyy}${MON[mon]||'07'}${dd.padStart(2,'0')}`;
+  document.getElementById('mBytes').innerHTML=
+    `<span class="hd">id ${c.serial*16}  value ${ymd}  tag psc.${c.serial}.0</span><br>`+payload;
+  document.getElementById('mByteInfo').innerHTML=
+    `PSC-1 v1 · 32-byte header + dictionary DEFLATE · Z85 → <b>${payload.length} chars</b> of the 175 available · `+
+    `<b>${rows} asmDB row${rows>1?'s':''}</b> · keccak256 anchored on-chain.`;
+
+  document.getElementById('modal').classList.add('open');
+  setTimeout(()=>document.querySelectorAll('#mStats .fill')
+    .forEach((f,i)=>setTimeout(()=>f.style.width=f.dataset.v+'%',i*140)),160);
+}
+function closeCard(){document.getElementById('modal').classList.remove('open')}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeCard()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCard()});
+
+/* holo tilt */
+document.getElementById('holoCard').addEventListener('mousemove',function(e){
+  const b=this.getBoundingClientRect();
+  const rx=((e.clientY-b.top)/b.height-.5)*-14, ry=((e.clientX-b.left)/b.width-.5)*14;
+  this.style.transform=`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) scale(1.03)`;
+});
+document.getElementById('holoCard').addEventListener('mouseleave',function(){this.style.transform=''});
+
+/* ══════════════════ COUNTDOWN ══════════════════ */
+setInterval(()=>{
+  const now=new Date(), n=new Date(now); n.setHours(10,0,0,0);
+  if(n<=now) n.setDate(n.getDate()+1);
+  const d=n-now, p=v=>String(v).padStart(2,'0');
+  document.getElementById('cd').textContent=
+    `${p(Math.floor(d/3.6e6))}:${p(Math.floor(d/6e4)%60)}:${p(Math.floor(d/1e3)%60)}`;
+},1000);
+
+/* ══════════════════ CONFETTI ══════════════════ */
+const cv=document.getElementById('confetti'), cx=cv.getContext('2d');
+let bits=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight}
+size(); addEventListener('resize',size);
+function burst(){
+  const cols=['#FF8FC5','#FFD86B','#7FE3C0','#8FD3FF','#8B6FE8','#FF7A59'];
+  for(let i=0;i<140;i++) bits.push({
+    x:innerWidth*.28, y:innerHeight*.45,
+    vx:(Math.random()-.5)*17, vy:Math.random()*-15-4,
+    s:5+Math.random()*8, c:cols[i%cols.length], r:Math.random()*6, life:150
+  });
+}
+(function loop(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  bits=bits.filter(b=>b.life-->0);
+  bits.forEach(b=>{
+    b.x+=b.vx; b.y+=b.vy; b.vy+=.42; b.vx*=.99; b.r+=.13;
+    cx.save(); cx.translate(b.x,b.y); cx.rotate(b.r);
+    cx.fillStyle=b.c; cx.globalAlpha=Math.min(1,b.life/45);
+    cx.fillRect(-b.s/2,-b.s/2,b.s,b.s); cx.restore();
+  });
+  requestAnimationFrame(loop);
+})();
+
+/* ══════════════════ TOAST / THEME / KONAMI ══════════════════ */
+let tt;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3600);
+}
+document.getElementById('themeBtn').addEventListener('click',function(){
+  const night=document.body.dataset.theme==='night';
+  document.body.dataset.theme=night?'':'night';
+  this.textContent=night?'🌙':'☀️';
+  toast(night?'Back to PuniPuni Paradise ☀️':'MOONLIT PUNIVERSE 🌙');
+});
+const KON=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let kp=[];
+addEventListener('keydown',e=>{
+  kp.push(e.key); kp=kp.slice(-10);
+  if(kp.join()===KON.join()){
+    document.getElementById('title').classList.add('rainbow');
+    burst(); toast('✦✦ SECRET SLIME UNLOCKED — DREAMDROP MODE ✦✦');
+  }
+});
+</script>
+</body>
+</html>
