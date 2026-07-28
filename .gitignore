@@ -35,3 +35,8 @@ Thumbs.db
 # Generated card output (the blob store is the source of truth)
 out/
 generated/
+
+# compiled ARM output from 'az bicep build'
+infra/*.json
+!infra/*.parameters.json
+

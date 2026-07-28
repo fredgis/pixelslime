@@ -90,6 +90,10 @@ Three structural facts from the docs and the sidecar source:
 2. **Integers travel as JSON strings** (a `u64` does not survive a JS `number`).
 3. **Scale-to-zero**: the free instance sleeps. The first call after idling returns `instance_starting`.
    → The client must **retry on cold start**, and the daily job must warm up (`/health`) before writing.
+4. **`hasMore` means "this page came back full"**, not "more rows definitely exist" — found by W3 while
+   building the client. A page landing exactly on the last row still reports `hasMore: true` and the next
+   fetch returns empty. Drive pagination off `nextOffset` and tolerate a final empty page.
+   `limit` defaults to 100 and caps at 1000.
 
 ### 1.3 The row shape — the central constraint
 
@@ -101,8 +105,8 @@ An asmDB row is **exactly 256 bytes, 7 fixed columns**, and the schema never cha
 | `8` | 1 | `status` | `u8` | 0 empty · 1 live · 2 tombstone |
 | `9` | 1 | `kind` | `u8` | reserved |
 | `12` | 4 | `clen` | `u32` | content length |
-| `16` | 8 | `created` | `i64` | epoch ms, **automatic** |
-| `24` | 8 | `updated` | `i64` | epoch ms, **automatic** |
+| `16` | 8 | `created` | `i64` | epoch ms, **automatic**. *(The asmDB README says `i64`; the sidecar actually validates it as `u64` — W3 found this. No practical impact, but do not assume negatives are accepted.)* |
+| `24` | 8 | `updated` | `i64` | epoch ms, **automatic** — same caveat |
 | `32` | 8 | `value` | `i64` | **the only numeric column, and the only one `RANGE` can filter on** |
 | `40` | 40 | `tag` | `char[40]` | **39 usable bytes**, single token |
 | `80` | 176 | `content` | `char[176]` | **175 usable bytes** |
@@ -296,7 +300,26 @@ flowchart TD
 | **`Cognitive Services User`** | `/subscriptions/49d5e158…/resourceGroups/FGI-AI/providers/Microsoft.CognitiveServices/accounts/fgi` ← **cross-RG; this is what replaces the disabled API key** |
 | `Monitoring Metrics Publisher` | `appi-pixelslime` |
 
-### 3.2 Why these choices
+### 3.2 Field notes from building it (W1)
+
+Four things the plan above got slightly wrong, found while writing the actual Bicep and validating it
+against Azure:
+
+1. **`uniqueString()` returns 13 characters**, which does not fit inside the 24-character limit for Key
+   Vault and Storage account names once the `kv-pixelslime-` / `stpixelslime` prefix is added. The
+   template uses the **first 10 characters** of it.
+2. **Container Apps Jobs need `replicaTimeout` and `replicaCompletionCount`**, which the resource
+   inventory omitted. Set to `1800` seconds and `1`.
+3. **The placeholder image listens on port 80**, not 8000. Ingress targets 80 for the bootstrap
+   deployment and switches to 8000 once the real image exists — hence the `deployPlaceholderImage` flag.
+4. **The cross-RG role assignment needs its own module deployed at `FGI-AI` scope.** It cannot be
+   expressed inline from a template targeting `FGI-ASMDBPIXELSMILES`. It validates correctly this way,
+   and `what-if` confirms the assignment appears under the `FGI-AI` scope.
+
+All requested SKUs were confirmed available in `swedencentral`, and all five role definition GUIDs were
+verified against `az role definition list` rather than trusted from this document.
+
+### 3.3 Why these choices
 
 - **One Container App serves both the API and the SPA.** One origin means **asmDB's missing CORS stops
   being a problem by construction**, and there is a single deployment.
@@ -307,7 +330,7 @@ flowchart TD
   in-process `APScheduler` would produce 0 or 3 cards. A cron Job guarantees **exactly one run**.
 - **No secrets in code or in plaintext environment variables**: Key Vault + managed identity.
 
-### 3.3 Estimated monthly cost
+### 3.4 Estimated monthly cost
 
 | Item | Estimate |
 |---|---|
@@ -321,7 +344,7 @@ flowchart TD
 | asmDB | Free tier (€0) |
 | **Total excluding AI** | **≈ €15–25 / month** |
 
-### 3.4 Publishing at 10:00 Paris, all year
+### 3.5 Publishing at 10:00 Paris, all year
 
 The daily card lands at **10:00 Europe/Paris**. That is slightly less trivial than it sounds, because
 **Container Apps Jobs cron expressions are evaluated in UTC only** — there is no timezone setting. Paris
@@ -1224,7 +1247,7 @@ Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both
 | 1 | **GO or adjustments** on this plan and on the mockup `docs/mockup/index.html` | — |
 | 2 | The **asmDB bearer token** placed in Key Vault (I create the vault and give you the exact command; **do not send it to me in plaintext**) | the only secret I cannot manufacture |
 | 3 | ~~Amoy testnet or Polygon mainnet~~ — **settled: Amoy testnet.** Free faucet gas, no real money anywhere, and a redeploy costs nothing while we watch how it behaves | ✅ |
-| 4 | ~~Confirm the daily publication time~~ — **settled: 10:00 Europe/Paris**, all year round (see [§3.4](#34-publishing-at-1000-paris-all-year)) | ✅ |
+| 4 | ~~Confirm the daily publication time~~ — **settled: 10:00 Europe/Paris**, all year round (see [§3.5](#35-publishing-at-1000-paris-all-year)) | ✅ |
 | 5 | ~~Approval to request a `gpt-image-2` quota increase~~ — **withdrawn.** I misread a burst of my own probe requests as a capacity problem. The limit is 2 requests per 60 s and we use one per day | ✅ nothing to do |
 | 6 | ~~Confirm the $SMILE economy parameters~~ — **settled: Genesis Rain 365,000, Bloom Fee 100 → 3,650 slimes = exactly 10 years** (see [§8.3](#83-the-economy-genesis-rain--bloom-burn--claim-pool)) | ✅ |
 | 7 | ~~Confirm the three-step chain rollout~~ — **settled: step 1 anchor-only → step 2 $SMILE → step 3 adoption**, all in scope, none deferred. The **sales model stays deliberately open** and is not designed yet | ✅ |
