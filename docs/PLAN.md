@@ -54,7 +54,8 @@ Endpoint: `https://fgi.services.ai.azure.com/openai/v1/images/generations`
 | `image`, `reference_images`, `input_fidelity`, `response_format` | ❌ **Unknown parameters on `/generations`** | You cannot pass a reference image to `/generations`. |
 | **`POST /openai/v1/images/edits`** | ✅ **Exists and accepts multipart** — `model` + `prompt` + `image=@mochibo.png` were all accepted (only a deliberately bogus field was rejected). | ✅ **This is how `mochibo.png` becomes the style template.** The single biggest unknown in this project is now resolved. |
 | **Multiple reference images** | ✅ **Supported via `image[]`.** Two files under `image[]` passed validation (the request then failed only on a deliberately invalid `size`). The singular `image` refuses duplicates and says so: *"use the array syntax instead e.g. `image[]=<value>`"*. | ✅ We can send **two** references at once — the layout canon **and** a rarity exemplar. See [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape). |
-| **Quota** | `GlobalStandard`, **capacity 2**, Sweden Central. Two calls close together → `429 … retry after 34 seconds`. | ⚠️ **Real risk.** The daily job (1 card) is fine, but seeding and retries need **exponential backoff that honours `Retry-After`**. A quota increase is recommended. |
+| **Rate limit** | `rateLimits: [{ key: "request", count: 2, renewalPeriod: 60 }]` — **2 requests per 60 seconds**. Not a daily cap and not a total quota. | ✅ **A non-issue for this workload.** We make **one image request per day**: 1 request per 1,440 minutes against an allowance of 2 per minute. Even seeding three slimes back to back is fine, because a 1024×1536 `quality=high` generation takes tens of seconds on its own. A modest retry backoff is kept purely as hygiene. |
+| **Capabilities** | `imageGenerations: true` · **`imageEdits: true`** · `convo2im: true` | Independent confirmation from the control plane that `/images/edits` is supported on this deployment. |
 
 ### 1.2 The asmDB database
 
@@ -1179,7 +1180,7 @@ Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both
 | # | Risk | Severity | Mitigation |
 |---|---|---|---|
 | R1 | `/images/edits` does not reproduce the template as faithfully as hoped | **Medium** *(downgraded — the endpoint is confirmed to accept the multipart template)* | Validate the visual result first thing in W4. Fallback: a very detailed style prompt on `/generations` (confirmed working) with `background=transparent`. Last-resort fallback: composite the frame in Pillow over a slime-only illustration — the most controllable option of all. |
-| R2 | **gpt-image-2 quota = 2** → frequent 429s | **High** | Backoff honouring `Retry-After`, serialised queue, staggered seeding. **Request a quota increase.** |
+| R2 | Hitting the `gpt-image-2` rate limit | **Negligible** *(corrected — I originally rated this High, wrongly)* | The limit is **2 requests per 60 seconds**, confirmed from the deployment's `rateLimits`. We issue **one per day**. I only ever triggered a 429 by firing eight probe requests within two seconds. Retry with `Retry-After` backoff is kept as hygiene, not as a mitigation. **No quota increase needed.** |
 | R3 | Generated text exceeds the byte budget | Medium | Length constraints in the schema + DEFLATE dictionary + chunking up to 4 rows + loud failure and regeneration |
 | R4 | asmDB cold start (free tier sleeps) | Medium | `/health` warm-up before writes, retry on `instance_starting`, backend index cache |
 | R5 | The model renders misspelled or unreadable text inside the image | Medium | Step 4 vision verification + regeneration; displayed stats always come from the JSON, which is the source of truth |
@@ -1214,7 +1215,7 @@ Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both
 | 2 | The **asmDB bearer token** placed in Key Vault (I create the vault and give you the exact command; **do not send it to me in plaintext**) | the only secret I cannot manufacture |
 | 3 | ~~Amoy testnet or Polygon mainnet~~ — **settled: Amoy testnet.** Free faucet gas, no real money anywhere, and a redeploy costs nothing while we watch how it behaves | ✅ |
 | 4 | ~~Confirm the daily publication time~~ — **settled: 10:00 Europe/Paris**, all year round (see [§3.4](#34-publishing-at-1000-paris-all-year)) | ✅ |
-| 5 | Approval to request a **`gpt-image-2` quota increase** (capacity is 2 today) | job reliability |
+| 5 | ~~Approval to request a `gpt-image-2` quota increase~~ — **withdrawn.** I misread a burst of my own probe requests as a capacity problem. The limit is 2 requests per 60 s and we use one per day | ✅ nothing to do |
 | 6 | ~~Confirm the $SMILE economy parameters~~ — **settled: Genesis Rain 365,000, Bloom Fee 100 → 3,650 slimes = exactly 10 years** (see [§8.3](#83-the-economy-genesis-rain--bloom-burn--claim-pool)) | ✅ |
 | 7 | ~~Confirm the three-step chain rollout~~ — **settled: step 1 anchor-only → step 2 $SMILE → step 3 adoption**, all in scope, none deferred. The **sales model stays deliberately open** and is not designed yet | ✅ |
 | 8 | ~~Confirm the reference-image strategy~~ — **settled: `mochibo.png` is sent on every generation as the anatomy canon**, with a per-rarity exemplar as a second `image[]` once the seed slimes exist (see [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape)) | ✅ |
