@@ -144,6 +144,11 @@ class ClaimPoolWriter:
         }
         call = self._contract.functions.recordBloom(serial, rarity_index(rarity), happiness)
         built: dict[str, Any] = dict(call.build_transaction(tx))
+        # eth_account's encoder rejects the 'from' key -- the sender is recovered from
+        # the signature rather than carried in the payload -- and reports it only as
+        # "Unknown kwargs: ['from']". build_transaction echoes back whatever it was
+        # handed, so it has to come off here.
+        built.pop("from", None)
         signed = self._signer.sign_transaction(built)
         tx_hash = bytes(self._web3.eth.send_raw_transaction(signed.raw_transaction))
 
