@@ -207,7 +207,12 @@ function PreBloom(): ReactElement {
 
       <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
 
-      <div className="flex flex-col items-center gap-8">
+      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
+        <div className="order-2 min-w-0 lg:order-1">
+          <PreviousSlime />
+        </div>
+
+        <div className="order-1 flex flex-col items-center gap-6 lg:order-2">
         <div
           role="img"
           aria-label="Today's slime has not bloomed yet"
@@ -262,9 +267,8 @@ function PreBloom(): ReactElement {
         </div>
 
         <Countdown label="NEXT SLIME IN" />
+        </div>
       </div>
-
-      <PreviousSlime />
 
       <p
         className="max-w-xl text-center"
@@ -366,21 +370,57 @@ export function TodayPage(): ReactElement {
         </div>
       </section>
 
-      <div ref={shakeRef} className="w-full max-w-[340px]">
-        <CardFlip
-          onReveal={handleReveal}
-          seal="✦ PIXEL RAIN ✦"
-          hint="CLICK OR PRESS ENTER"
-          revealedLabel={`${card.name}, ${card.rarity} ${card.type} — today’s bloom`}
+      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        {/* The collection so far, laid out along the left so it reads before the fold. */}
+        <section
+          className="order-2 min-w-0 lg:order-1"
+          aria-labelledby="recent-heading"
         >
-          <SmartImage
-            src={card.imageUrl}
-            thumb={card.thumbUrl}
-            alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
-            sizes="(max-width: 640px) 88vw, 340px"
-            eager
-          />
-        </CardFlip>
+          <h2
+            id="recent-heading"
+            className="mb-4 text-center font-pixel text-[15px] text-ink lg:text-left"
+          >
+            RECENTLY BLOOMED
+          </h2>
+          {recentItems.length === 0 ? (
+            <p className="text-center font-stat text-[12px] tracking-[2px] text-ink-soft lg:text-left">
+              The garden is just getting started — today’s is the very first.
+            </p>
+          ) : (
+            // A horizontal rail rather than a grid: with two slimes a six-column grid
+            // left one card marooned beside five empty cells. A rail is honest at any
+            // count, and scrolls sideways instead of pushing the card below the fold.
+            <ul className="flex snap-x gap-4 overflow-x-auto pb-3">
+              {recentItems.map((item, i) => (
+                <li key={item.serial} className="w-[168px] shrink-0 snap-start">
+                  <SlimeCard
+                    card={toSlimeCardData(item)}
+                    index={i}
+                    isNew={i === 0}
+                    onOpen={(serial) => navigate(`/slime/${serial}`)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div ref={shakeRef} className="order-1 w-full max-w-[340px] justify-self-center lg:order-2">
+          <CardFlip
+            onReveal={handleReveal}
+            seal="✦ PIXEL RAIN ✦"
+            hint="CLICK OR PRESS ENTER"
+            revealedLabel={`${card.name}, ${card.rarity} ${card.type} — today’s bloom`}
+          >
+            <SmartImage
+              src={card.imageUrl}
+              thumb={card.thumbUrl}
+              alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
+              sizes="(max-width: 640px) 88vw, 340px"
+              eager
+            />
+          </CardFlip>
+        </div>
       </div>
 
       {revealed ? (
@@ -424,30 +464,6 @@ export function TodayPage(): ReactElement {
           A brand-new slime blooms every day at 10:00 Paris time. Flip today’s card to meet it.
         </p>
       )}
-
-      <section className="w-full" aria-labelledby="recent-heading">
-        <h2 id="recent-heading" className="mb-4 text-center font-pixel text-[15px] text-ink">
-          RECENTLY BLOOMED
-        </h2>
-        {recentItems.length === 0 ? (
-          <p className="text-center font-stat text-[12px] tracking-[2px] text-ink-soft">
-            The garden is just getting started.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            {recentItems.map((item, i) => (
-              <li key={item.serial}>
-                <SlimeCard
-                  card={toSlimeCardData(item)}
-                  index={i}
-                  isNew={i === 0}
-                  onOpen={(serial) => navigate(`/slime/${serial}`)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
