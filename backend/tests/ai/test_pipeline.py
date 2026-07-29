@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import httpx
+import pytest
 import respx
 from _ai_helpers import (
     chat_response,
@@ -13,11 +14,14 @@ from _ai_helpers import (
     make_white_bordered_png,
     metadata_payload,
     tiny_png,
+    valid_card_dict,
     vision_payload,
 )
 from conftest import CHAT_URL, IMAGES_URL
 
-from app.ai.pipeline import generate_card
+from app.ai.errors import EncodingError
+from app.ai.models import Card
+from app.ai.pipeline import assert_encodable, generate_card
 from app.ai.prompt import MasterPrompt
 from app.ai.roll import roll
 
@@ -46,6 +50,19 @@ def _card_view(card_type: str) -> dict[str, object]:
         "agility": payload["agility"],
         "happiness": payload["happiness"],
     }
+
+
+def test_assert_encodable_accepts_a_valid_card() -> None:
+    assert_encodable(Card.model_validate(valid_card_dict()))  # a legal card does not raise
+
+
+def test_assert_encodable_rejects_a_byte_overlong_field() -> None:
+    # 40 chars is inside the schema's *character* limit for `quote`, but each CJK
+    # glyph is 3 UTF-8 bytes (120 > the codec's 80-byte limit, docs/CODEC.md §3.6),
+    # so the pre-image gate must fail loudly rather than burn a ~100s generation.
+    card = Card.model_validate(valid_card_dict(quote="水" * 40))
+    with pytest.raises(EncodingError, match="cannot be encoded into PSC-1"):
+        assert_encodable(card)
 
 
 @respx.mock

@@ -3,14 +3,21 @@
 From the verified 1024x1536 card PNG this produces the derived artefacts the rest
 of the system needs:
 
-* the alpha-trimmed PNG (transparent margin removed);
 * a 512x768 WebP thumbnail (exactly half the card, so the layout is preserved);
 * the SHA-256 of the canonical PNG — the codec anchors a card to its blob using
   the first 4 bytes (``art_sha``, ``docs/CODEC.md`` / ``card.schema.json``);
 * the dominant palette, so the UI can tint itself from the art.
 
-The SHA-256 is taken over the *exact bytes passed in* (the canonical card the
-pipeline returns and W8 uploads), so ``art_sha`` provably identifies that blob.
+The canonical PNG is deliberately **not** alpha-trimmed. ``art_sha`` is the first
+4 bytes of ``sha256(png_bytes)`` and is written into the PSC-1 header that gets
+keccak256'd on-chain, so the bytes W8 uploads must be the *exact* bytes hashed
+here — trimming would upload a blob whose hash no longer matched its on-chain
+anchor. The full 1024x1536 canvas (transparent margin included) is also what the
+brief requires ("fond transparent hors carte c'est important") and what keeps the
+gallery layout fixed across rarities, whose frames overflow their bounds by
+different amounts. So the SHA-256 is taken over the *exact bytes passed in* (the
+canonical card the pipeline returns and W8 uploads), and ``art_sha`` provably
+identifies that blob.
 """
 
 from __future__ import annotations
@@ -35,7 +42,6 @@ class PostProcessResult:
 
     sha256: str
     art_sha: str
-    trimmed_png: bytes
     thumbnail_webp: bytes
     palette: list[str]
 
@@ -47,19 +53,6 @@ def _open(png_bytes: bytes) -> Image.Image:
     except Exception as exc:
         raise PostProcessError(f"could not open image for post-processing: {exc}") from exc
     return img.convert("RGBA")
-
-
-def trim_alpha(img: Image.Image) -> Image.Image:
-    """Crop away the fully-transparent margin, by the alpha channel only.
-
-    We trim on alpha (not ``Image.getbbox``, which keeps a transparent-but-
-    coloured pixel) so a stray non-black-but-invisible pixel cannot defeat the
-    trim.
-    """
-    bbox = img.getchannel("A").getbbox()
-    if bbox is None:
-        return img
-    return img.crop(bbox)
 
 
 def make_thumbnail(img: Image.Image) -> bytes:
@@ -96,18 +89,19 @@ def dominant_palette(img: Image.Image, *, n_colors: int = 6) -> list[str]:
 
 
 def postprocess(png_bytes: bytes, *, n_colors: int = 6) -> PostProcessResult:
-    """Run every post-processing step and return the derived artefacts."""
+    """Run every post-processing step and return the derived artefacts.
+
+    The canonical PNG is intentionally left un-trimmed: ``art_sha`` is the first 4
+    bytes of this ``sha256`` and anchors these *exact* bytes in the on-chain PSC-1
+    header, so the blob W8 uploads must hash to the same value. Trimming to the
+    alpha bounding box (see the module docstring) would also delete the
+    transparent margin the brief requires and make dimensions vary per rarity.
+    """
     digest = hashlib.sha256(png_bytes).hexdigest()
     img = _open(png_bytes)
-
-    trimmed = trim_alpha(img)
-    trimmed_buf = io.BytesIO()
-    trimmed.save(trimmed_buf, format="PNG")
-
     return PostProcessResult(
         sha256=digest,
         art_sha=digest[:8],
-        trimmed_png=trimmed_buf.getvalue(),
         thumbnail_webp=make_thumbnail(img),
         palette=dominant_palette(img, n_colors=n_colors),
     )

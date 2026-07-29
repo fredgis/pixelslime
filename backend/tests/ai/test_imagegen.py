@@ -10,6 +10,7 @@ import pytest
 import respx
 from _ai_helpers import (
     image_edits_response,
+    make_card_png,
     make_white_bordered_png,
     tiny_png,
     valid_card_dict,
@@ -24,12 +25,13 @@ from app.ai.config import (
     IMAGE_OUTPUT_FORMAT,
     IMAGE_QUALITY,
 )
-from app.ai.errors import ImageGenerationError
+from app.ai.errors import ImageGenerationError, RateLimitError
 from app.ai.imagegen import (
     background_to_alpha,
     build_image_prompt,
     build_request,
     generate_image,
+    promote_exemplar,
     resolve_references,
 )
 from app.ai.prompt import MasterPrompt
@@ -69,6 +71,48 @@ def test_resolve_references_appends_distinct_exemplar(tmp_path: Path) -> None:
 def test_resolve_references_missing_canon_raises(tmp_path: Path) -> None:
     with pytest.raises(ImageGenerationError, match="anatomy canon"):
         resolve_references("COMMON", template_dir=tmp_path)
+
+
+def test_promote_exemplar_writes_named_file_then_resolve_picks_it_up(tmp_path: Path) -> None:
+    directory = _template_dir(tmp_path)  # canon present, no exemplar yet
+    assert [p.name for p in resolve_references("COMMON", template_dir=directory)] == ["mochibo.png"]
+
+    card_png = make_card_png(seed=3)
+    target = promote_exemplar("COMMON", card_png, template_dir=directory)
+
+    assert target.name == "ref-common.png"
+    assert target.read_bytes() == card_png
+    # The two-reference strategy is now self-populated for this tier.
+    assert [p.name for p in resolve_references("COMMON", template_dir=directory)] == [
+        "mochibo.png",
+        "ref-common.png",
+    ]
+
+
+def test_promote_exemplar_refuses_overwrite_without_flag(tmp_path: Path) -> None:
+    first = make_card_png(seed=1)
+    promote_exemplar("RARE", first, template_dir=tmp_path)
+    with pytest.raises(ImageGenerationError, match="already exists"):
+        promote_exemplar("RARE", make_card_png(seed=2), template_dir=tmp_path)
+    # Explicit overwrite is honoured — promotion is a deliberate human act.
+    replacement = make_card_png(seed=2)
+    promote_exemplar("RARE", replacement, template_dir=tmp_path, overwrite=True)
+    assert (tmp_path / "ref-rare.png").read_bytes() == replacement
+
+
+def test_promote_exemplar_rejects_wrong_dimensions(tmp_path: Path) -> None:
+    with pytest.raises(ImageGenerationError, match="1024x1536"):
+        promote_exemplar("EPIC", tiny_png(), template_dir=tmp_path)
+
+
+def test_promote_exemplar_rejects_missing_alpha(tmp_path: Path) -> None:
+    with pytest.raises(ImageGenerationError, match="no alpha channel"):
+        promote_exemplar("EPIC", make_card_png(with_alpha=False), template_dir=tmp_path)
+
+
+def test_promote_exemplar_rejects_unknown_rarity(tmp_path: Path) -> None:
+    with pytest.raises(ImageGenerationError, match="unknown rarity"):
+        promote_exemplar("SPARKLY", make_card_png(), template_dir=tmp_path)
 
 
 def test_build_request_uses_plural_image_field_with_canon_present(tmp_path: Path) -> None:
@@ -230,6 +274,53 @@ async def test_generate_image_exhausts_attempts_on_persistent_5xx(
             sleep=sleeps,
         )
     assert len(sleeps.calls) == 2  # slept between attempts, not after the last
+
+
+@respx.mock
+async def test_generate_image_raises_rate_limit_error_on_persistent_429(
+    client: httpx.AsyncClient, master_prompt: MasterPrompt, tmp_path: Path
+) -> None:
+    respx.post(IMAGES_URL).mock(
+        return_value=httpx.Response(429, headers={"Retry-After": "9"}, text="slow down")
+    )
+    sleeps = _Sleeps()
+    with pytest.raises(RateLimitError) as caught:
+        await generate_image(
+            valid_card_dict(),
+            _ROLL,
+            client=client,
+            master_prompt=master_prompt,
+            template_dir=_template_dir(tmp_path),
+            prompt="PROMPT",
+            max_attempts=3,
+            sleep=sleeps,
+        )
+    exc = caught.value
+    assert isinstance(exc, ImageGenerationError)  # back-compat: old handlers still catch it
+    assert exc.attempts == 3  # the retry count W8 can act on
+    assert exc.retry_after == 9.0  # the parsed Retry-After, as structured data
+    assert "HTTP 429" in str(exc)  # message still matches W8's current classifier
+    assert len(sleeps.calls) == 2  # slept between the three attempts, not after the last
+
+
+@respx.mock
+async def test_generate_image_rate_limit_error_without_retry_after_header(
+    client: httpx.AsyncClient, master_prompt: MasterPrompt, tmp_path: Path
+) -> None:
+    respx.post(IMAGES_URL).mock(return_value=httpx.Response(429, text="slow down"))
+    with pytest.raises(RateLimitError) as caught:
+        await generate_image(
+            valid_card_dict(),
+            _ROLL,
+            client=client,
+            master_prompt=master_prompt,
+            template_dir=_template_dir(tmp_path),
+            prompt="PROMPT",
+            max_attempts=2,
+            sleep=_Sleeps(),
+        )
+    assert caught.value.retry_after is None  # no usable header -> None, not a guess
+    assert caught.value.attempts == 2
 
 
 @respx.mock

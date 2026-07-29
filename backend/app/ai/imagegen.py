@@ -30,7 +30,9 @@ import httpx
 from PIL import Image, ImageDraw
 
 from .config import (
+    CARD_HEIGHT,
     CARD_SIZE,
+    CARD_WIDTH,
     IMAGE_BACKGROUND,
     IMAGE_BG_KEY_MAX_FRACTION,
     IMAGE_BG_KEY_THRESHOLD,
@@ -38,10 +40,11 @@ from .config import (
     IMAGE_OUTPUT_FORMAT,
     IMAGE_QUALITY,
     RARITY_FINISHES,
+    RARITY_ORDER,
     assets_template_dir,
     rarity_ordinal,
 )
-from .errors import ImageGenerationError
+from .errors import ImageGenerationError, RateLimitError
 from .prompt import MasterPrompt
 from .roll import Roll
 
@@ -73,6 +76,49 @@ def resolve_references(rarity: str, *, template_dir: Path | None = None) -> list
     if exemplar.is_file() and exemplar.resolve() != canon.resolve():
         references.append(exemplar)
     return references
+
+
+def promote_exemplar(
+    rarity: str,
+    png_bytes: bytes,
+    *,
+    template_dir: Path | None = None,
+    overwrite: bool = False,
+) -> Path:
+    """Install ``png_bytes`` as the tier exemplar ``ref-<rarity>.png`` (human-run).
+
+    §5.2's two-reference strategy is meant to be self-populating: once a card is
+    judged the canonical look of its tier it becomes that tier's exemplar, and
+    :func:`resolve_references` then attaches it as the second ``image[]`` on every
+    later generation of the same rarity. Deciding *which* card earns that is a
+    taste judgement, so promotion is a deliberate, human-invoked step — never
+    something the daily job does unattended (see the W4 follow-up report). The
+    bytes are validated (portrait ``1024x1536`` with a real alpha channel) so a
+    malformed or opaque render cannot silently become the canon, and an existing
+    exemplar is left untouched unless ``overwrite`` is set.
+    """
+    if rarity.upper() not in RARITY_ORDER:
+        raise ImageGenerationError(f"unknown rarity {rarity!r}; cannot name an exemplar for it")
+    directory = template_dir or assets_template_dir()
+    target = directory / f"ref-{rarity.lower()}.png"
+    if target.exists() and not overwrite:
+        raise ImageGenerationError(
+            f"exemplar {target.name} already exists; pass overwrite=True to replace it"
+        )
+    try:
+        img = Image.open(io.BytesIO(png_bytes))
+        img.load()
+    except Exception as exc:
+        raise ImageGenerationError(f"exemplar is not a decodable image: {exc}") from exc
+    if img.size != (CARD_WIDTH, CARD_HEIGHT):
+        raise ImageGenerationError(
+            f"exemplar must be {CARD_WIDTH}x{CARD_HEIGHT} portrait, got {img.width}x{img.height}"
+        )
+    if "A" not in img.getbands():
+        raise ImageGenerationError("exemplar has no alpha channel; expected a transparent card")
+    directory.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(png_bytes)
+    return target
 
 
 def _finish_contrast(rarity: str) -> str:
@@ -279,27 +325,43 @@ async def generate_image(
     data, files = build_request(prompt, references, n=n)
 
     last_detail = ""
+    last_status: int | None = None
+    last_retry_after: float | None = None
     for attempt in range(max_attempts):
         wait: float
         try:
             resp = await client.post("images/edits", data=data, files=files)
         except httpx.HTTPError as exc:
             last_detail = f"transport error: {exc}"
+            last_status = None
             wait = _backoff_seconds(attempt)
         else:
             if resp.status_code == 200:
                 png = _decode_image(resp)
                 return background_to_alpha(png) if recover_alpha else png
             last_detail = f"HTTP {resp.status_code}: {resp.text[:300]}"
+            last_status = resp.status_code
             if resp.status_code not in _RETRYABLE_STATUS:
                 raise ImageGenerationError(f"/images/edits failed, not retryable — {last_detail}")
             retry_after = _retry_after_seconds(resp)
+            last_retry_after = retry_after
             wait = retry_after if retry_after is not None else _backoff_seconds(attempt)
 
         if attempt + 1 >= max_attempts:
             break
         await sleep(wait)
 
+    if last_status == 429:
+        # A persistent 429 gets its own typed error carrying the parsed Retry-After
+        # and the attempts spent, so W8 can react to structured data rather than
+        # string-matching. The message keeps the "HTTP 429" marker for callers that
+        # have not yet migrated off substring matching.
+        raise RateLimitError(
+            f"/images/edits rate-limited (HTTP 429) after {max_attempts} attempts — "
+            f"last: {last_detail}",
+            retry_after=last_retry_after,
+            attempts=max_attempts,
+        )
     raise ImageGenerationError(
         f"/images/edits failed after {max_attempts} attempts — last: {last_detail}"
     )

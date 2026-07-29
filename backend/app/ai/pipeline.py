@@ -18,8 +18,12 @@ from typing import Any, cast
 import httpx
 import structlog
 
+from app.codec import Card as CodecCard
+from app.codec import CodecError
+from app.codec import encode as codec_encode
+
 from .config import STYLE_ID, assets_template_dir, rarity_ordinal
-from .errors import VerificationError
+from .errors import EncodingError, VerificationError
 from .imagegen import Sleeper, build_image_prompt, generate_image
 from .metadata import CardText, generate_metadata
 from .models import Card, CardTypeName, Flags, RarityName
@@ -106,6 +110,28 @@ def _assemble_card(
     )
 
 
+def assert_encodable(card: Card) -> None:
+    """Reject a card that cannot be packed into PSC-1 *before* the costly image.
+
+    ``docs/PLAN.md`` §5 validates the encode before spending on the image; a card
+    whose text overflows the codec's UTF-8 byte limits (``docs/CODEC.md`` §3.6,
+    stricter than the schema's character limits) or the 560-byte stream ceiling
+    would otherwise burn a ~100-second image generation before failing. The trial
+    encode depends only on the text/enum fields — the header ``art_sha`` and
+    ``companion_id`` do not change the compressed body size — so running it on the
+    pre-image card is representative of the final one.
+
+    W2 proved this cannot fire for a schema-valid card today (the largest legal
+    body, 520 bytes, deflates to a 557-byte stream under the 560-byte ceiling); the
+    gate is defence in depth against a future length-limit relaxation, at a cost of
+    microseconds.
+    """
+    try:
+        codec_encode(CodecCard.model_validate(card.to_card_dict()))
+    except CodecError as exc:
+        raise EncodingError(f"card {card.serial} cannot be encoded into PSC-1: {exc}") from exc
+
+
 async def generate_card(
     *,
     mint_day: int,
@@ -150,6 +176,7 @@ async def generate_card(
     log.info("metadata.done", name=text.name, level=text.level)
 
     base_card = _assemble_card(serial, mint_day, the_roll, text, is_seed=is_seed)
+    assert_encodable(base_card)  # §5: reject an unpackable card before the ~100s image
     card_dict = base_card.model_dump(by_alias=True)
     image_prompt = build_image_prompt(prompt, card_dict, the_roll)
 

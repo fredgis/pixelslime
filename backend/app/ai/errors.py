@@ -28,6 +28,22 @@ class RollError(GenerationError):
     """
 
 
+class EncodingError(GenerationError):
+    """The validated card cannot be packed into a PSC-1 stream.
+
+    Raised by the pre-image gate (``docs/PLAN.md`` §5, "validate the encode before
+    spending on the image") when a *trial* :func:`app.codec.encode` fails — either a
+    UTF-8 byte-limit overflow (``docs/CODEC.md`` §3.6, stricter than the schema's
+    character limits) or the 560-byte stream ceiling — so a card that could never
+    be stored fails *before* a ~100-second image generation is spent on it.
+
+    W2 proved this cannot fire for a schema-valid card today (the largest legal
+    body, 520 bytes, deflates to a 557-byte stream against the 560-byte ceiling).
+    The gate is therefore defence in depth against a future length-limit relaxation
+    silently breaking that invariant, not a check against today's code.
+    """
+
+
 class MetadataError(GenerationError):
     """The text model failed to produce usable card metadata."""
 
@@ -49,6 +65,27 @@ class MetadataValidationError(MetadataError):
 
 class ImageGenerationError(GenerationError):
     """The image endpoint (`/images/edits`) failed after retries/backoff."""
+
+
+class RateLimitError(ImageGenerationError):
+    """`/images/edits` kept returning HTTP 429 until the retries were exhausted.
+
+    A subclass of :class:`ImageGenerationError` so existing ``except
+    ImageGenerationError`` handlers still catch it, but it additionally carries the
+    parsed ``Retry-After`` seconds (``None`` when the server sent no usable header)
+    and the number of attempts consumed. W8's daily job can then schedule its own
+    backoff from *structured* data (``retry_after``/``attempts``) instead of
+    string-matching the message text, which is brittle. The message still contains
+    the ``HTTP 429`` marker so a caller that has not yet migrated off substring
+    matching keeps working.
+    """
+
+    def __init__(
+        self, message: str, *, retry_after: float | None = None, attempts: int = 0
+    ) -> None:
+        super().__init__(message)
+        self.retry_after: float | None = retry_after
+        self.attempts: int = attempts
 
 
 class VerificationError(GenerationError):
