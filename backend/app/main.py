@@ -124,6 +124,7 @@ async def _reconcile_loop(
             health = await source.health()
             index.engine = health.engine
             await index.reconcile(source)
+            await index.refresh_pending_anchors(source)
             index.degraded = False
             await blob.save_index(index.to_json_bytes())
         except (AsmDbError, OSError, ValueError) as exc:

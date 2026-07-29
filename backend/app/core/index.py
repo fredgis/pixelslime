@@ -28,7 +28,7 @@ from typing import Any, Protocol
 from app.asmdb import AsmDbError
 from app.codec import RARITIES, TYPES, Card, CodecError
 
-from .chain import ChainAnchor
+from .chain import ChainAnchor, chain_from_storage_dict, chain_storage_dict
 from .logging import get_logger
 from .source import CardSource
 from .time import mint_date, paris_today, yyyymmdd
@@ -148,6 +148,53 @@ class CardIndex:
                 continue
             self.upsert(card, await _read_chain(source, serial))
 
+    async def refresh_chain(self, source: CardSource, serial: int) -> bool:
+        """Re-read one serial's anchor row and fold its chain state into the live index.
+
+        The *targeted* counterpart to a full rebuild. Minting and anchoring are
+        decoupled (``docs/PLAN.md`` §8.13): a card is indexed on the day it blooms and
+        its ``part = 8`` row lands some days later, so the add-only :meth:`reconcile`
+        never revisits it. This refreshes exactly that card's ``chain`` / ``onChain``
+        off the hot path — no restart, no rescan of the collection — and is what W8
+        calls after a successful anchor. Returns ``True`` once the serial is present.
+        """
+        card = self.get(serial)
+        if card is None:
+            try:
+                card = await source.read_card(serial)
+            except (AsmDbError, CodecError) as exc:
+                _log.warning("refresh_chain_read_failed", serial=serial, error=str(exc))
+                return False
+        was_anchored = self.chain_for(serial) is not None
+        chain = await _read_chain(source, serial)
+        self.upsert(card, chain)
+        if (chain is not None) != was_anchored:
+            _log.info("chain_refreshed", serial=serial, on_chain=chain is not None)
+        return True
+
+    async def refresh_pending_anchors(self, source: CardSource) -> int:
+        """Re-poll only the cards mid-anchor — header claims on-chain, no row read yet.
+
+        Closes the asynchronous-anchor staleness gap for the running app without a full
+        rescan. ``flags.on_chain`` is used *only* to pick which serials to re-read; the
+        decoded anchor row stays the sole source of truth for ``onChain`` (D2), so the
+        poll set is bounded to cards whose row is expected imminently and drains itself
+        as those rows land. Returns the number newly anchored on this pass.
+        """
+        pending = [
+            serial
+            for serial, entry in self._by_serial.items()
+            if entry.chain is None and entry.card.flags.on_chain
+        ]
+        updated = 0
+        for serial in pending:
+            await self.refresh_chain(source, serial)
+            if self.chain_for(serial) is not None:
+                updated += 1
+        if updated:
+            _log.info("pending_anchors_refreshed", refreshed=updated, pending=len(pending))
+        return updated
+
     # ── reads ───────────────────────────────────────────────────────────────
     @property
     def size(self) -> int:
@@ -241,7 +288,7 @@ class CardIndex:
             "cards": [
                 {
                     "card": entry.card.model_dump(mode="json"),
-                    "chain": entry.chain.to_storage_dict() if entry.chain is not None else None,
+                    "chain": chain_storage_dict(entry.chain) if entry.chain is not None else None,
                 }
                 for entry in self._by_serial.values()
             ],
@@ -263,7 +310,7 @@ class CardIndex:
         for item in cards:
             if isinstance(item, dict) and "card" in item:
                 card = Card.model_validate(item["card"])
-                chain = ChainAnchor.from_storage_dict(item.get("chain"))
+                chain = chain_from_storage_dict(item.get("chain"))
             else:
                 card = Card.model_validate(item)
                 chain = None

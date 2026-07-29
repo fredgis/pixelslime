@@ -14,8 +14,10 @@ import json
 from _api_helpers import ClientFactory, anchor_for, build_card, card_minted_today
 
 from app.chain import build_anchor_row_from_result
-from app.core.chain import decode_anchor_content
+from app.chain.anchor_row import AMOY_EXPLORER_TX_BASE
+from app.core.chain import read_anchor
 from app.core.index import CardIndex
+from app.core.source import InMemoryCardSource
 
 
 def test_anchored_card_populates_chain_detail(make_client: ClientFactory) -> None:
@@ -27,8 +29,9 @@ def test_anchored_card_populates_chain_detail(make_client: ClientFactory) -> Non
     assert body["onChain"] is True
     assert body["chain"] == {
         "tokenId": 123,
-        "txHash": "0x" + "ab" * 8,  # only the 8-byte prefix is stored on-chain (§4.4)
+        "txHash": "0x" + "ab" * 32,  # v0x02 stores the full 32-byte transaction hash (§4.4)
         "blockNumber": 456789,
+        "explorerUrl": AMOY_EXPLORER_TX_BASE + "0x" + "ab" * 32,
     }
 
 
@@ -80,30 +83,30 @@ def test_today_card_surfaces_chain(make_client: ClientFactory) -> None:
     assert card["chain"]["tokenId"] == 5
 
 
-# ── the decoder itself (app/chain/ ships no decoder; core owns it) ────────────
+# ── the read-path decoder wrapper (app/chain/ owns the codec; core degrades it) ──
 def test_decode_anchor_round_trips_the_real_encoder() -> None:
     row = build_anchor_row_from_result(anchor_for(42, token_id=7, block_number=99, tx_byte=0x11))
-    anchor = decode_anchor_content(row.content, serial=42)
+    anchor = read_anchor(row.content, serial=42)
     assert anchor is not None
     assert anchor.token_id == 7
     assert anchor.block_number == 99
-    assert anchor.tx_hash == "0x" + "11" * 8
+    assert anchor.tx_hash_hex == "0x" + "11" * 32
 
 
 def test_decode_anchor_rejects_bad_content() -> None:
-    assert decode_anchor_content("not valid z85 at all", serial=1) is None
-    assert decode_anchor_content("", serial=1) is None
+    assert read_anchor("not valid z85 at all", serial=1) is None
+    assert read_anchor("", serial=1) is None
 
 
 def test_decode_anchor_rejects_serial_mismatch() -> None:
     row = build_anchor_row_from_result(anchor_for(42))
-    assert decode_anchor_content(row.content, serial=99) is None  # row is for 42, not 99
+    assert read_anchor(row.content, serial=99) is None  # row is for 42, not 99
 
 
 # ── warm-start persistence: a restart must not lose a card's anchor ───────────
 def test_index_persistence_preserves_chain() -> None:
     row = build_anchor_row_from_result(anchor_for(3, token_id=8, block_number=77, tx_byte=0x22))
-    anchor = decode_anchor_content(row.content, serial=3)
+    anchor = read_anchor(row.content, serial=3)
     assert anchor is not None
 
     index = CardIndex()
@@ -130,3 +133,39 @@ def test_index_persistence_reads_legacy_flat_cards() -> None:
     index.load_json_bytes(legacy)
     assert index.contains(11)
     assert index.chain_for(11) is None
+
+
+# ── targeted refresh: a late async anchor must surface without a restart ───────
+async def test_refresh_chain_folds_in_a_late_anchor() -> None:
+    # Minting and anchoring are decoupled (PLAN §8.13): the card is indexed first, its
+    # part=8 row lands days later, and the add-only reconcile never revisits it.
+    source = InMemoryCardSource()
+    source.add_card(build_card(12, on_chain=True))  # header claims on-chain...
+    index = CardIndex()
+    await index.reconcile(source)
+    assert index.chain_for(12) is None  # ...but the anchor row has not landed yet
+
+    source.add_anchor(anchor_for(12, token_id=77))  # the asynchronous anchor arrives
+    assert await index.refresh_chain(source, 12) is True
+
+    anchor = index.chain_for(12)
+    assert anchor is not None
+    assert anchor.token_id == 77
+
+
+async def test_refresh_pending_anchors_only_polls_flagged_cards() -> None:
+    source = InMemoryCardSource()
+    source.add_card(build_card(1, on_chain=True))  # mid-anchor: flag set, row pending
+    source.add_card(build_card(2))  # flag clear: never expected on-chain
+    index = CardIndex()
+    await index.reconcile(source)
+
+    # Nothing to surface until a row exists.
+    assert await index.refresh_pending_anchors(source) == 0
+
+    source.add_anchor(anchor_for(1))  # card 1's row lands
+    source.add_anchor(anchor_for(2))  # card 2 gets one out of band too
+    assert await index.refresh_pending_anchors(source) == 1  # only the flagged card is re-read
+
+    assert index.chain_for(1) is not None
+    assert index.chain_for(2) is None  # flag clear → never polled, so never a wasted read

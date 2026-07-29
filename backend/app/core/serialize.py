@@ -23,7 +23,7 @@ from typing import Any
 from app.codec import Card, card_hash, encode, encode_stream
 
 from . import contracts
-from .chain import ChainAnchor
+from .chain import ChainAnchor, chain_api_dict
 from .time import mint_date
 
 
@@ -101,7 +101,7 @@ def card_detail(
         "dayNumber": card.serial if day_number is None else day_number,
         "imageUrl": image_url(card.serial),
         "thumbUrl": thumb_url(card.serial),
-        "chain": chain.to_api_dict() if chain is not None else None,
+        "chain": chain_api_dict(chain) if chain is not None else None,
         "onChain": chain is not None,
     }
     house = contracts.rarity_houses().get(card.rarity)

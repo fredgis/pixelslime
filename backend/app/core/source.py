@@ -23,7 +23,7 @@ from app.asmdb import Row as AsmDbRow
 from app.chain import AnchorResult, build_anchor_row_from_result
 from app.codec import Card, Row, decode, encode
 
-from .chain import ANCHOR_ROW_PART, ChainAnchor, decode_anchor_content
+from .chain import ANCHOR_ROW_PART, ChainAnchor, read_anchor
 
 _MAX_CONTENT_BYTES = 175
 _FORBIDDEN_BYTES = (0x00, 0x0D, 0x0A)
@@ -113,7 +113,7 @@ class AsmDbCardSource:
             row = await self._client.get(serial * 16 + ANCHOR_ROW_PART)
         except AsmDbNotFound:
             return None
-        return decode_anchor_content(row.content, serial=serial)
+        return read_anchor(row.content, serial=serial)
 
     async def card_for_date(self, yyyymmdd_value: int) -> Card | None:
         try:
@@ -206,7 +206,7 @@ class InMemoryCardSource:
         row = self._anchor_rows.get(serial)
         if row is None:
             return None
-        return decode_anchor_content(row.content, serial=serial)
+        return read_anchor(row.content, serial=serial)
 
     async def card_for_date(self, yyyymmdd_value: int) -> Card | None:
         for rows in self._rows.values():

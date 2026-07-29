@@ -1,130 +1,118 @@
-"""Decode the PSC-1 ``part = 8`` on-chain anchor row into the API's ``Chain`` shape.
+"""Core's view of the on-chain anchor: project and persist W9's :class:`ChainAnchor`.
 
-``app/chain/anchor_row.py`` (W9) *encodes* the anchor row but ships no decoder, so
-the read path grows one here. The point of decoding is that ``chain`` (and the
-``onChain`` badge that mirrors it) must be driven by the **evidence in asmDB** — the
-presence of a well-formed anchor row — and never by the header's ``flags.on_chain``
-bit alone: a crash between "set the flag / mint" and "write the anchor row" can leave
-a card flagged on-chain with no row, and trusting the flag would then have the gallery
-claim a card is anchored while its detail view shows ``chain: null`` (W10's D2).
+The canonical ``part = 8`` wire format — encoder *and* decoder — lives in
+:mod:`app.chain.anchor_row` (W9). This module owns only what the *read path* layers on
+top of it:
 
-The 28-byte payload layout and Z85 envelope mirror ``app.chain.anchor_row`` exactly —
-same struct, same magic/version, same one Z85 implementation from the codec — so this
-decoder and W9's encoder are a matched pair (``docs/CODEC.md`` §4.4).
+* :func:`read_anchor` — decode a *present* anchor row, degrading a corrupt one to
+  ``None`` with a loud log instead of raising, so one bad row skips a single card
+  rather than taking startup down (the resilience the index already gives a missing
+  continuation row).
+* :func:`chain_api_dict` — project a decoded anchor onto the contract's ``chain``
+  object (``tokenId`` / ``txHash`` / ``blockNumber`` / ``explorerUrl``).
+* :func:`chain_storage_dict` / :func:`chain_from_storage_dict` — round-trip an anchor
+  through the ``index.json`` warm-start snapshot losslessly.
 
-Only an 8-byte **prefix** of the transaction hash is stored on-chain (§4.4), so
-``txHash`` is surfaced as a ``0x``-prefixed 16-hex-character prefix, not a full hash;
-``explorerUrl`` is therefore not emitted, since a per-transaction link cannot be built
-from a prefix. See the W7 report.
+``chain`` (and the ``onChain`` badge that mirrors it) is driven by the *evidence* — a
+well-formed anchor row — never by the header's ``flags.on_chain`` bit, which a crash
+between mint and anchor-write can leave set with no row (W10's D2). ``ChainAnchor`` is
+re-exported here so the rest of ``core`` has one import site, but it stays W9's single
+type — this module defines no second copy of it.
+
+The current ``0x02`` row carries the full 32-byte transaction hash, so ``explorerUrl``
+is a real per-transaction link; the historical ``0x01`` row stored only an 8-byte
+prefix and yields no link, so :func:`chain_api_dict` omits ``explorerUrl`` in that case
+(the contract's ``explorerUrl`` is a non-nullable ``string``).
 """
 
 from __future__ import annotations
 
-import struct
-from dataclasses import dataclass
 from typing import Any
 
-from app.chain.anchor_row import ANCHOR_MAGIC, ANCHOR_PART, ANCHOR_VERSION
-from app.codec import Z85Error
-from app.codec.z85 import z85_decode
+from app.chain import ChainAnchor, try_decode_anchor_row
+from app.chain.anchor_row import ANCHOR_PART
 
 from .logging import get_logger
 
 _log = get_logger(__name__)
 
-#: Little-endian layout of the §4.4 payload: magic, version, serial, tx-hash prefix,
-#: block number, tokenId, card-hash prefix — byte-identical to the W9 encoder.
-_ANCHOR_STRUCT = struct.Struct("<BBH8sII8s")
-
-#: asmDB row id / part for the anchor row, re-exported for the source adapter.
+#: asmDB row part for the anchor row, re-exported for the source adapter's id maths.
 ANCHOR_ROW_PART = ANCHOR_PART
 
+__all__ = [
+    "ANCHOR_ROW_PART",
+    "ChainAnchor",
+    "chain_api_dict",
+    "chain_from_storage_dict",
+    "chain_storage_dict",
+    "read_anchor",
+]
 
-@dataclass(frozen=True)
-class ChainAnchor:
-    """The on-chain facts decoded from a ``part = 8`` anchor row.
 
-    ``tx_hash_prefix`` and ``card_hash_prefix`` are the 8-byte prefixes §4.4 stores;
-    the full hashes are not recoverable from asmDB.
+def read_anchor(content: str, *, serial: int) -> ChainAnchor | None:
+    """Decode a *present* ``part = 8`` row's content, or ``None`` if it will not decode.
+
+    Delegates the bytes to W9's non-raising :func:`app.chain.try_decode_anchor_row`,
+    pinning ``expected_serial`` so a row addressed to another serial is rejected.
+    Callers reach here only once they already hold a row, so a ``None`` means the row
+    is present but corrupt — logged loudly so a partially-written or malformed anchor is
+    never a silent "not anchored".
     """
-
-    serial: int
-    token_id: int
-    block_number: int
-    tx_hash_prefix: bytes
-    card_hash_prefix: bytes
-
-    @property
-    def tx_hash(self) -> str:
-        """The stored transaction-hash prefix as ``0x`` + 16 hex characters."""
-        return "0x" + self.tx_hash_prefix.hex()
-
-    def to_api_dict(self) -> dict[str, Any]:
-        """Project onto the contract's ``Chain`` object (``tokenId``/``txHash``/``blockNumber``)."""
-        return {
-            "tokenId": self.token_id,
-            "txHash": self.tx_hash,
-            "blockNumber": self.block_number,
-        }
-
-    def to_storage_dict(self) -> dict[str, Any]:
-        """Serialise losslessly for the ``index.json`` warm-start snapshot."""
-        return {
-            "serial": self.serial,
-            "tokenId": self.token_id,
-            "blockNumber": self.block_number,
-            "txHashPrefix": self.tx_hash_prefix.hex(),
-            "cardHashPrefix": self.card_hash_prefix.hex(),
-        }
-
-    @classmethod
-    def from_storage_dict(cls, data: object) -> ChainAnchor | None:
-        """Rebuild from :meth:`to_storage_dict`; return ``None`` on any malformed input."""
-        if not isinstance(data, dict):
-            return None
-        try:
-            return cls(
-                serial=int(data["serial"]),
-                token_id=int(data["tokenId"]),
-                block_number=int(data["blockNumber"]),
-                tx_hash_prefix=bytes.fromhex(str(data["txHashPrefix"])),
-                card_hash_prefix=bytes.fromhex(str(data["cardHashPrefix"])),
-            )
-        except (KeyError, TypeError, ValueError):
-            return None
+    anchor = try_decode_anchor_row(content, expected_serial=serial)
+    if anchor is None:
+        _log.warning("anchor_row_corrupt", serial=serial)
+    return anchor
 
 
-def decode_anchor_content(content: str, *, serial: int) -> ChainAnchor | None:
-    """Decode a ``part = 8`` row's content, or return ``None`` if it is not a valid anchor.
+def chain_api_dict(anchor: ChainAnchor) -> dict[str, Any]:
+    """Project a decoded anchor onto the contract's ``chain`` object.
 
-    Returns ``None`` (never raises) on any structural problem — bad Z85, wrong length,
-    wrong magic/version, or a serial that does not match the row it was read for — so a
-    single corrupt anchor row degrades that one card to "not anchored" instead of
-    failing index construction. Every rejection is logged so the state is never silent.
+    ``txHash`` is the stored transaction hash as ``0x`` + hex. ``explorerUrl`` is
+    included only when the full 32-byte hash is present (a ``0x02`` row): a working
+    per-transaction link cannot be built from the legacy 8-byte prefix, and the
+    contract types ``explorerUrl`` as a non-nullable ``string``, so it is omitted
+    rather than emitted as ``null`` for a ``0x01`` row.
     """
+    data: dict[str, Any] = {
+        "tokenId": anchor.token_id,
+        "txHash": anchor.tx_hash_hex,
+        "blockNumber": anchor.block_number,
+    }
+    explorer = anchor.explorer_url
+    if explorer is not None:
+        data["explorerUrl"] = explorer
+    return data
+
+
+def chain_storage_dict(anchor: ChainAnchor) -> dict[str, Any]:
+    """Serialise a decoded anchor losslessly for the ``index.json`` warm-start snapshot.
+
+    Stores the full hashes as hex and keeps the ``version`` byte, so a warm restart
+    reconstructs the exact anchor (and therefore the same ``explorerUrl``) without
+    re-reading asmDB.
+    """
+    return {
+        "version": anchor.version,
+        "serial": anchor.serial,
+        "tokenId": anchor.token_id,
+        "blockNumber": anchor.block_number,
+        "txHash": anchor.tx_hash.hex(),
+        "cardHash": anchor.card_hash.hex(),
+    }
+
+
+def chain_from_storage_dict(data: object) -> ChainAnchor | None:
+    """Rebuild a :class:`ChainAnchor` from :func:`chain_storage_dict`; ``None`` if malformed."""
+    if not isinstance(data, dict):
+        return None
     try:
-        raw = z85_decode(content)
-    except Z85Error:
-        _log.warning("anchor_decode_failed", serial=serial, reason="z85")
+        return ChainAnchor(
+            version=int(data["version"]),
+            serial=int(data["serial"]),
+            token_id=int(data["tokenId"]),
+            block_number=int(data["blockNumber"]),
+            tx_hash=bytes.fromhex(str(data["txHash"])),
+            card_hash=bytes.fromhex(str(data["cardHash"])),
+        )
+    except (KeyError, TypeError, ValueError):
         return None
-    if len(raw) < _ANCHOR_STRUCT.size:
-        _log.warning("anchor_decode_failed", serial=serial, reason="short")
-        return None
-
-    magic, version, row_serial, tx_prefix, block_number, token_id, card_prefix = (
-        _ANCHOR_STRUCT.unpack(raw[: _ANCHOR_STRUCT.size])
-    )
-    if magic != ANCHOR_MAGIC or version != ANCHOR_VERSION:
-        _log.warning("anchor_decode_failed", serial=serial, reason="magic")
-        return None
-    if row_serial != serial:
-        _log.warning("anchor_serial_mismatch", serial=serial, row_serial=row_serial)
-        return None
-
-    return ChainAnchor(
-        serial=serial,
-        token_id=token_id,
-        block_number=block_number,
-        tx_hash_prefix=tx_prefix,
-        card_hash_prefix=card_prefix,
-    )
