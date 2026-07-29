@@ -35,7 +35,12 @@ contract SmileToken is ERC20, ERC20Burnable, AccessControl {
     /// @dev Raised if a constructor address is the zero address.
     error ZeroAddress();
 
-    /// @param treasury_ The Vault / Key Vault key that holds the Genesis Rain.
+    /// @dev Raised if `admin == treasury_`. Enforced here rather than left to the
+    ///      deploy script, because an invariant that only holds when the caller
+    ///      happens to use one particular script is not an invariant.
+    error AdminMustDifferFromTreasury();
+
+    /// @param treasury_ The Vault that holds the Genesis Rain.
     /// @param admin The governance address that administers roles (the PARAMS
     ///        holder of §8.5). It MUST differ from `treasury_`: were the Treasury
     ///        its own admin it could re-grant itself `MINTER_ROLE`, and the
@@ -44,13 +49,17 @@ contract SmileToken is ERC20, ERC20Burnable, AccessControl {
         if (treasury_ == address(0) || admin == address(0)) {
             revert ZeroAddress();
         }
+        if (admin == treasury_) {
+            revert AdminMustDifferFromTreasury();
+        }
         treasury = treasury_;
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
 
         // Grant, use, and immediately renounce the Treasury's minting power. After
-        // this constructor there is no code path — and, given `admin != treasury`,
-        // no governance path reachable by the Treasury — that lets the Treasury
-        // mint again. The Genesis Rain is a one-shot event.
+        // this constructor there is no code path — and, because `admin != treasury`
+        // is now checked above rather than assumed, no governance path reachable by
+        // the Treasury — that lets the Treasury mint again. The Genesis Rain is a
+        // one-shot event.
         _grantRole(MINTER_ROLE, treasury_);
         _mint(treasury_, GENESIS_RAIN);
         _revokeRole(MINTER_ROLE, treasury_);

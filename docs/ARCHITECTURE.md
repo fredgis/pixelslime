@@ -2,15 +2,38 @@
 
 > This describes what is **running**, not what was planned. Where the two differ, the difference is
 > explained — usually because reality pushed back. [`PLAN.md`](PLAN.md) holds the reasoning;
-> [`RUNBOOK.md`](RUNBOOK.md) holds the operations.
+> [`RUNBOOK.md`](RUNBOOK.md) holds the operations; [`HOWITWORKS.md`](HOWITWORKS.md) follows the
+> byte-for-byte data path.
+>
+> **Live-state checkpoint:** Azure, the public API and Polygon Amoy were queried on **2026-07-29**.
+> Where the checked-in source is newer than the active container image, that deployment drift is
+> called out explicitly rather than blurred into the architecture.
 
 | | |
 |---|---|
 | Subscription | `<SUBSCRIPTION_ID>` |
 | Resource group | `FGI-ASMDBPIXELSMILES` · `swedencentral` |
-| Public URL | `ca-pixelslime-api.blackbay-470e05c9.swedencentral.azurecontainerapps.io` |
+| Public site | [`https://www.pixelslime.cloud`](https://www.pixelslime.cloud) · managed certificate · `SniEnabled` |
+| Platform FQDN | `ca-pixelslime-api.blackbay-470e05c9.swedencentral.azurecontainerapps.io` |
+| Apex domain | `pixelslime.cloud` is present with a disabled binding; its managed certificate is failed |
+| Live health | `{"status":"ok","cards":1,"engine":"1.7.0"}` |
+| Active image | `crpixelslimededh2k35j5.azurecr.io/pixelslime:v8` |
 | Database | asmDB Cloud · `smilesdb` · instance `<ASMDB_INSTANCE>` |
-| Chain | Polygon **Amoy** testnet |
+| Chain | Polygon **Amoy** testnet · chain id `80002` |
+
+## Contents
+
+- [1. The whole picture](#1-the-whole-picture)
+- [2. Why there is a VNet at all](#2-why-there-is-a-vnet-at-all)
+- [3. Where the secrets live](#3-where-the-secrets-live)
+- [4. The jobs architecture](#4-the-jobs-architecture)
+- [5. How a card is stored in 175 bytes](#5-how-a-card-is-stored-in-175-bytes)
+- [6. The chain, and why the fee is real](#6-the-chain-and-why-the-fee-is-real)
+- [7. Reading a card, end to end](#7-reading-a-card-end-to-end)
+- [8. Azure resource inventory](#8-azure-resource-inventory)
+- [9. How to navigate the codebase](#9-how-to-navigate-the-codebase)
+- [10. What it costs](#10-what-it-costs)
+- [11. Drift, limitations, and deviations](#11-drift-limitations-and-deviations)
 
 ---
 
@@ -27,58 +50,65 @@ flowchart TB
         direction TB
         subgraph SNETACA["snet-aca · 10.42.0.0/23 · delegated to Microsoft.App/environments"]
           API["<b>ca-pixelslime-api</b><br/>Container App · 0 to 3 replicas<br/>FastAPI + the built React SPA<br/><i>one origin, so zero CORS</i>"]
-          JOB["<b>caj-pixelslime-daily</b><br/>Container Apps Job<br/>cron 0 8,9 UTC · Paris-hour guard"]
+          DAILY["<b>caj-pixelslime-daily</b><br/>Container Apps Job<br/>cron 0 8,9 UTC<br/><i>command selected by PIXELSLIME_JOB</i>"]
+          ANCHOR["<b>caj-pixelslime-anchor</b><br/>Container Apps Job<br/>cron 30 8,9 UTC<br/><i>idempotent catch-up sweep</i>"]
         end
         subgraph SNETPE["snet-private-endpoints · 10.42.2.0/28"]
-          PE["<b>pe-blob</b><br/>private endpoint"]
+          PE["<b>pe-stpixelslimededh2k35j5-blob</b><br/>private endpoint"]
         end
       end
 
       MI(["<b>id-pixelslime</b><br/>user-assigned managed identity"])
-      ST[("<b>stpixelslime…</b><br/>Blob Storage<br/>cards · thumbs · assets<br/><b>public access DISABLED</b>")]
-      ACR["<b>crpixelslime…</b><br/>Container Registry · Basic"]
+      ST[("<b>stpixelslimededh2k35j5</b><br/>Blob Storage<br/>cards · thumbs · assets<br/><b>public network DISABLED</b>")]
+      ACR["<b>crpixelslimededh2k35j5</b><br/>Container Registry · Basic"]
       OBS["<b>appi-pixelslime</b><br/>App Insights + Log Analytics"]
-      KV[("<b>kv-pixelslime…</b><br/>Key Vault<br/><i>deployed but unused —<br/>see section 3</i>")]
+      KV[("<b>kv-pixelslime-dedh2k35j5</b><br/>Key Vault<br/><i>deployed but its data plane<br/>is unreachable from the workloads</i>")]
     end
 
     AI["<b>fgi</b> · resource group FGI-AI<br/>gpt-image-2 · gpt-5.6-sol"]
     DB[("<b>asmdb.cloud</b> · smilesdb<br/><b>source of truth</b>")]
-    CHAIN["<b>Polygon Amoy</b><br/>PixelSlimeCard · SMILE · ClaimPool"]
+    RPC["<b>polygon-amoy.drpc.org</b><br/>JSON-RPC<br/><i>supports the required log scans</i>"]
+    CHAIN["<b>Polygon Amoy</b><br/>PixelSlimeCard · SmileToken<br/>ClaimPool · SlimeAdoption"]
 
     NET -->|HTTPS| API
     API --> MI
-    JOB --> MI
+    DAILY --> MI
+    ANCHOR --> MI
     PE -->|private link| ST
     API -->|blob reads| PE
-    JOB -->|blob writes| PE
+    DAILY -->|blob writes| PE
     MI -->|Cognitive Services User<br/>cross resource group| AI
     MI -->|AcrPull| ACR
     MI -->|Blob Data Contributor| ST
-    API -->|bearer token| DB
-    JOB -->|bearer token| DB
-    JOB -->|keccak256 anchor| CHAIN
+    API -->|startup and reconcile| DB
+    DAILY -->|card rows| DB
+    ANCHOR -->|read cards and write part 8| DB
+    DAILY -->|metadata and image| AI
+    ANCHOR -->|signed transactions| RPC
+    RPC --> CHAIN
     API --> OBS
-    JOB --> OBS
+    DAILY --> OBS
+    ANCHOR --> OBS
 
-    classDef net    fill:#FFF6E5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef app    fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef job    fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef ident  fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef data   fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef model  fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
-    classDef priv   fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
-    classDef dim    fill:#E7DCFF,stroke:#8B6FE8,stroke-width:2px,color:#5B4A7D
+    classDef gold fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef pink fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef lilac fill:#E7DCFF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef orange fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
+    classDef blue fill:#8FD3FF,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef mint fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
 
-    class NET net
-    class API app
-    class JOB job
-    class MI ident
-    class ST,DB data
-    class AI,CHAIN model
-    class PE priv
-    class ACR,OBS dim
-    class KV dim
+    class NET,ACR,OBS lilac
+    class API,PE,RPC blue
+    class DAILY,ANCHOR mint
+    class MI,AI,CHAIN gold
+    class ST,DB pink
+    class KV orange
 ```
+
+The API and both jobs run the **same immutable image** with different entrypoints. The API owns the
+public read path; generation owns AI, blob and card-row writes; anchoring owns chain writes. Keeping
+anchoring separate means an RPC outage can never roll back or suppress a valid card already stored in
+asmDB.
 
 ---
 
@@ -89,7 +119,9 @@ whole thing was meant to cost €15–25/month. Two governance policies changed 
 
 ```mermaid
 flowchart LR
-    P["<b>Management-group policy</b><br/>MCAPSGovDeployPolicies<br/>KeyVault_PublicNetwork_Modify"]
+    P["<b>Management-group assignment</b><br/>MCAPSGovDeployPolicies"]
+    PK["<b>KeyVault_PublicNetwork_Modify</b>"]
+    PS["<b>StorageAccount_PublicNetwork_Modify</b>"]
     KVX["<b>Key Vault</b><br/>publicNetworkAccess forced to Disabled<br/><i>reverted our Bicep in under 10 s</i>"]
     STX["<b>Storage</b><br/>publicNetworkAccess forced to Disabled<br/><i>reverted in 20 s</i>"]
 
@@ -98,22 +130,24 @@ flowchart LR
     C["<b>VNet + private endpoint</b><br/>which forces a VNet-injected<br/>Container Apps environment"]
     D["<b>Environment recreated</b><br/>vnetConfiguration is immutable"]
 
-    P --> KVX --> A
-    P --> STX --> B --> C --> D
+    P --> PK --> KVX --> A
+    P --> PS --> STX --> B --> C --> D
 
-    classDef policy fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
-    classDef block  fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef ok     fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef work   fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef gold fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef orange fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
+    classDef blue fill:#8FD3FF,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef mint fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
 
-    class P policy
-    class KVX,STX block
-    class A ok
-    class B,C,D work
+    class P orange
+    class PK,PS,KVX,STX gold
+    class A mint
+    class B,C,D blue
 ```
 
-**What was checked rather than assumed.** Only Storage and Key Vault are restricted. The container
-registry (Basic) and Log Analytics both still accept public traffic, so they need no private
+The two resources are modified by **separate policy definitions under the same assignment**. Azure
+Policy reported both resources compliant with the `modify` action, and the live control plane showed
+`publicNetworkAccess: Disabled` on each. Only Storage and Key Vault are restricted: ACR Basic,
+Application Insights and Log Analytics still accept public traffic, so they need no private
 endpoints. Scoping the network to a **single** private endpoint instead of four kept the footprint and
 the cost down.
 

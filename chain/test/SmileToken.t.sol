@@ -85,6 +85,21 @@ contract SmileTokenTest is W9EconomyFixture {
         new SmileToken(treasury, address(0));
     }
 
+    /// @notice The refill guarantee must be enforced by the contract, not by the
+    ///         deploy script alone.
+    /// @dev The constructor grants the Treasury MINTER_ROLE, mints the Genesis Rain,
+    ///      then revokes it. That revocation only *means* anything if the Treasury
+    ///      cannot re-grant it — which is exactly what DEFAULT_ADMIN_ROLE allows. So
+    ///      an `admin == treasury` deployment leaves the Treasury able to refill a
+    ///      reserve documented as unrefillable, and every "the burn is real" claim
+    ///      built on top becomes false. Deploy.s.sol checked this, but a contract
+    ///      whose core invariant depends on the caller using one particular script
+    ///      is not enforcing it.
+    function test_ConstructorRejectsTreasuryAsItsOwnAdmin() public {
+        vm.expectRevert(SmileToken.AdminMustDifferFromTreasury.selector);
+        new SmileToken(treasury, treasury);
+    }
+
     function test_CannotBurnMoreThanBalance() public {
         vm.prank(treasury);
         vm.expectRevert(

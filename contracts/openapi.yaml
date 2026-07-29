@@ -190,7 +190,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [total, byRarity, byType, genesisRemaining, bloomsRemaining]
+                required: [total, byRarity, byType, genesisRemaining, genesisBurned, genesisTotal, poolTotal, bloomsRemaining]
                 properties:
                   total: { type: integer }
                   byRarity:
@@ -199,7 +199,10 @@ paths:
                   byType:
                     type: object
                     additionalProperties: { type: integer }
-                  genesisRemaining: { type: integer, description: SMILE left in the Genesis Rain }
+                  genesisRemaining: { type: integer, description: "SMILE left in the Genesis Rain. Only ever decreases — the reserve is never refilled." }
+                  genesisBurned:    { type: integer, description: "SMILE destroyed so far, one flat 100 fee per bloom. The mirror image of `genesisRemaining`." }
+                  genesisTotal:     { type: integer, description: "The reserve's fixed starting size, 365000. Present so a client can draw a gauge without hard-coding it." }
+                  poolTotal:        { type: integer, description: "SMILE minted into the Claim Pool across every bloom — the sum of each card's `smileYield`. Grows while `genesisRemaining` shrinks; the two are deliberately separate purses." }
                   bloomsRemaining:  { type: integer, description: Slimes that can still be minted }
 
   /api/nft/{serial}:
@@ -335,6 +338,7 @@ components:
         mood:      { type: [string, "null"], description: "Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
         companion: { type: [string, "null"], description: "Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.**" }
         onChain:   { type: boolean, description: "Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present." }
+        smileYield: { type: integer, description: "Whole $SMILE this card mints into the Claim Pool when its bloom is recorded, as `happiness * rarity multiplier`. Computed locally from the very fields the contract is handed, so it cannot disagree with `ClaimPool.recordBloom`. Present whether or not the bloom has actually been recorded yet." }
         palette:
           type: array
           description: Dominant colours of the artwork, so the UI can tint itself to the card.
