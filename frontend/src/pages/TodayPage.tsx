@@ -111,23 +111,20 @@ function PreviousSlime(): ReactElement | null {
   return (
     <aside
       aria-labelledby="previous-heading"
-      className="relative w-full max-w-[420px] overflow-hidden rounded-xl border-4 border-ink p-6 shadow-card"
+      className="relative w-full overflow-hidden rounded-xl border-4 border-ink p-6 shadow-card md:p-8"
       style={{
         background: palette ?? tokens.color.cream,
         animation: reduced ? 'none' : 'ps-bobin .7s var(--ps-pop) both',
       }}
     >
-      <Sparkles />
+      <Sparkles count={14} />
 
-      <div className="relative flex flex-col items-center gap-4">
-        <Ribbon icon="✧" tone={tokens.color.mint}>
-          PREVIOUSLY DISCOVERED
-        </Ribbon>
-
+      <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8">
+        {/* Artwork */}
         <button
           type="button"
           onClick={() => navigate(`/slime/${summary.serial}`)}
-          className="ps-focusable w-full max-w-[250px] rounded-lg"
+          className="ps-focusable w-full max-w-[230px] shrink-0 rounded-lg"
           style={{ animation: reduced ? 'none' : 'ps-breathe 5.5s ease-in-out infinite' }}
           aria-label={`See ${summary.name}, the previously discovered slime`}
         >
@@ -136,60 +133,65 @@ function PreviousSlime(): ReactElement | null {
               src={summary.thumbUrl}
               thumb={summary.thumbUrl}
               alt={`${summary.name}, a ${summary.rarity} ${summary.type} slime`}
-              sizes="250px"
+              sizes="230px"
             />
           </HoloCard>
         </button>
 
-        <h2 id="previous-heading" className="font-pixel text-[22px] text-ink">
-          {summary.name}
-        </h2>
-
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <RarityBadge rarity={summary.rarity} />
-          <TypePill type={summary.type} />
-          <Chip>LV {summary.level}</Chip>
-          {summary.shiny ? (
-            <Chip tone={tokens.color.sunbeam} icon="✨">
-              SHINY
-            </Chip>
-          ) : null}
-        </div>
-
-        {stats.length > 0 ? (
-          <div className="flex w-full flex-col gap-2">
-            {stats.map(([stat, value], i) => (
-              <StatBar key={stat} stat={stat} value={value} index={i} />
-            ))}
+        {/* Identity + stats + actions */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex flex-col items-center gap-3 md:items-start">
+            <Ribbon icon="✧" tone={tokens.color.mint}>
+              PREVIOUSLY DISCOVERED
+            </Ribbon>
+            <h2 id="previous-heading" className="font-pixel text-[26px] text-ink">
+              {summary.name}
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+              <RarityBadge rarity={summary.rarity} />
+              <TypePill type={summary.type} />
+              <Chip>LV {summary.level}</Chip>
+              {summary.shiny ? (
+                <Chip tone={tokens.color.sunbeam} icon="✨">
+                  SHINY
+                </Chip>
+              ) : null}
+              {typeof card?.smileYield === 'number' ? (
+                <Chip tone={tokens.color.sky} icon="✨">
+                  +{card.smileYield.toLocaleString()} $SMILE
+                </Chip>
+              ) : null}
+              {summary.onChain ? (
+                <Chip tone={tokens.color.mint} icon="⛓">
+                  ON-CHAIN
+                </Chip>
+              ) : null}
+            </div>
           </div>
-        ) : null}
 
-        {card?.quote ? (
-          <p className="text-center font-stat text-[13px] italic text-ink-soft">
-            “{card.quote}”
-          </p>
-        ) : null}
+          {stats.length > 0 ? (
+            <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+              {stats.map(([stat, value], i) => (
+                <StatBar key={stat} stat={stat} value={value} index={i} />
+              ))}
+            </div>
+          ) : null}
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {typeof card?.smileYield === 'number' ? (
-            <Chip tone={tokens.color.sky} icon="✨">
-              +{card.smileYield.toLocaleString()} $SMILE
-            </Chip>
+          {card?.quote ? (
+            <p className="text-center font-stat text-[13px] italic text-ink-soft md:text-left">
+              “{card.quote}”
+            </p>
           ) : null}
-          {summary.onChain ? (
-            <Chip tone={tokens.color.mint} icon="⛓">
-              ON-CHAIN
-            </Chip>
-          ) : null}
+
+          <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
+            <PixelButton variant="ghost" onClick={() => navigate(`/slime/${summary.serial}`)}>
+              ✦ MEET {summary.name.toUpperCase()}
+            </PixelButton>
+            <span className="font-stat text-[11px] tracking-[1px] text-ink-soft">
+              {summary.cardId} · {formatMintDate(summary.mintDate)}
+            </span>
+          </div>
         </div>
-
-        <p className="font-stat text-[11px] tracking-[1px] text-ink-soft">
-          {summary.cardId} · {formatMintDate(summary.mintDate)}
-        </p>
-
-        <PixelButton variant="ghost" onClick={() => navigate(`/slime/${summary.serial}`)}>
-          ✦ MEET {summary.name.toUpperCase()}
-        </PixelButton>
       </div>
     </aside>
   );
@@ -205,15 +207,10 @@ function PreBloom(): ReactElement {
 
       <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
 
-      <div className="flex w-full flex-col items-center justify-center gap-10 lg:flex-row lg:items-center">
-        <div className="order-2 flex justify-center lg:order-1">
-          <PreviousSlime />
-        </div>
-
-        <div className="order-1 flex flex-col items-center gap-8 lg:order-2">
-          <div
-            role="img"
-            aria-label="Today's slime has not bloomed yet"
+      <div className="flex flex-col items-center gap-8">
+        <div
+          role="img"
+          aria-label="Today's slime has not bloomed yet"
         style={{
           position: 'relative',
           width: 'min(360px, 80vw)',
@@ -262,11 +259,12 @@ function PreBloom(): ReactElement {
         >
           STILL CONDENSING
         </span>
-          </div>
-
-          <Countdown label="NEXT SLIME IN" />
         </div>
+
+        <Countdown label="NEXT SLIME IN" />
       </div>
+
+      <PreviousSlime />
 
       <p
         className="max-w-xl text-center"
