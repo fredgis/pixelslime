@@ -31,6 +31,7 @@ chain = [
     "web3>=7.6",
     "eth-account>=0.13",
     "eth-utils>=5.1",
+    "azure-keyvault-keys>=4.9",
 ]
 
 [build-system]
@@ -58,8 +59,9 @@ warn_unreachable = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["web3.*", "eth_account.*"]
+module = ["web3.*", "eth_account.*", "eth_keys.*", "eth_utils.*"]
 ignore_missing_imports = true
+implicit_reexport = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

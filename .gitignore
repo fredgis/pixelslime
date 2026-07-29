@@ -40,3 +40,10 @@ generated/
 infra/*.json
 !infra/*.parameters.json
 
+
+# Foundry
+chain/out/
+chain/cache/
+chain/broadcast/
+chain/lib/
+

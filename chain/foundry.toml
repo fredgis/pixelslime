@@ -1,0 +1,42 @@
+# PIXELSLIME — W9 chain (Foundry)
+#
+# evm_version is pinned to "paris" on purpose: Polygon PoS (Amoy included) has a
+# history of lagging mainnet opcodes, so we avoid PUSH0/Cancun features entirely.
+# None of these contracts need transient storage, so paris costs us nothing and
+# guarantees the bytecode runs on Amoy exactly as it runs on the local Anvil node.
+
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+script = "script"
+libs = ["lib"]
+solc_version = "0.8.28"
+evm_version = "paris"
+optimizer = true
+optimizer_runs = 200
+# Loud builds: deny compiling with any warning so `forge build` stays clean.
+deny = "warnings"
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+
+[lint]
+# `smile`, `treasury`, `vault`, `card` are public immutables whose lowercase names
+# double as ERC-style getters (`smile.treasury()`); SCREAMING_SNAKE would make those
+# getters read oddly. We keep the conventional names and silence only that style lint.
+exclude_lints = ["screaming-snake-case-immutable"]
+
+[rpc_endpoints]
+amoy = "${AMOY_RPC_URL}"
+
+[etherscan]
+amoy = { key = "${POLYGONSCAN_API_KEY}", chain = 80002, url = "https://api-amoy.polygonscan.com/api" }

@@ -1,0 +1,14 @@
+# Foundry build + cache artefacts
+out/
+cache/
+broadcast/
+
+# Dependencies vendored by download (OpenZeppelin), not committed
+lib/
+
+# Local RPC / deploy secrets — never committed (belt and braces with root .gitignore)
+.env
+.env.*
+
+# Recorded deployment addresses are environment-specific
+deployments/*.json

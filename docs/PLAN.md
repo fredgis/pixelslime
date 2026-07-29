@@ -1084,12 +1084,57 @@ long as we like before deciding whether real money is ever involved.
 
 | Contract | Standard | Purpose |
 |---|---|---|
-| `SmileToken.sol` | **ERC-20** `$SMILE` | `ERC20Burnable` + `AccessControl`. `GENESIS_RAIN` minted once to the Treasury in the constructor, then **the Treasury's minter role is renounced** — so the puddle provably cannot be refilled. |
+| `SmileToken.sol` | **ERC-20** `$SMILE` | `ERC20Burnable` + `AccessControl`. `GENESIS_RAIN` minted once to the Treasury, then **the Treasury's minter role is renounced**. ⚠️ **The admin key must be a different key from the Treasury** — otherwise the Treasury can re-grant itself `MINTER_ROLE` and the guarantee evaporates. Enforced in the constructor. See [§8.10](#810-three-ways-this-could-have-been-violated-on-paper). |
 | `PixelSlimeCard.sol` | **ERC-721** | `tokenId = serial`. Stores `bytes32 cardHash = keccak256(PSC-1 stream)`. `tokenURI` → `/api/nft/{serial}`. Minted to the Vault. |
-| `ClaimPool.sol` | — | Holds bloom yield. Pays out against **EIP-712 vouchers** signed by the Key Vault key. Per-wallet and per-card caps enforced on-chain. |
+| `ClaimPool.sol` | — | Holds bloom yield. **Computes the yield on-chain** from `(serial, rarity, happiness)` so the amount cannot be forged by a compromised backend. Pays out against **EIP-712 vouchers** `(wallet, serial, amount, nonce, deadline)` signed by the Key Vault key — note the **`deadline`**, without which a leaked voucher would be claimable forever. Per-wallet and per-card caps enforced on-chain, nonce replay rejected. |
 | `SlimeAdoption.sol` | — | Chain step 3. Burns $SMILE, transfers the NFT out of the Vault. |
 
-### 8.10 Signing transactions — without ever exposing a private key
+### 8.10 Three ways this could have been violated on paper
+
+The economy above was designed in prose and had never been compiled. When W9 implemented it, three
+latent holes appeared — each one a way to make the central principle *"the payer and the earner are
+never the same purse"* quietly false. All three are now closed in code and tested; they are recorded
+here because the plan as originally written permitted every one of them.
+
+**1. `admin == treasury` would have made the burn theatre.** §8 gave the Treasury both the Genesis Rain
+*and* the contracts' admin role. An admin can `grantRole(MINTER_ROLE, self)` — so the Treasury could
+simply mint itself a fresh puddle, and *"the Rain can never be refilled"* would have been a sentence
+rather than a guarantee. **The admin key and the Treasury key must be distinct**, this is now enforced
+in the constructor and re-checked at deploy time, and it is a hard requirement on whoever runs the
+deployment. This was the most valuable finding of the whole build.
+
+**2. A leaked claim voucher would have been redeemable forever.** §8.4 specified the voucher as
+`(wallet, serial, amount, nonce)` with no expiry and no way to rotate one out. The tuple is now
+**five fields, with a `deadline`**.
+
+**3. Leaving the yield amount to the backend would have made $SMILE forgeable.** If the pool mints
+whatever figure the caller passes, a compromised backend key mints unlimited supply. **The formula now
+lives on-chain** — the caller supplies `serial`, `rarity` and `happiness`, and the contract computes
+`happiness × multiplier` itself. The job supplies inputs, never payouts.
+
+### 8.11 The arithmetic closes — and it is a knife-edge
+
+Verified by simulating all 3,650 blooms in Foundry against the rarity census from §8.6:
+
+```
+[PASS] test_3650BloomsDrainGenesisRainToExactlyZero
+  Genesis Rain remaining (wei): 0
+  Total $SMILE in existence at year 10 (whole): 904050
+```
+
+That confirms the ≈905,000 figure in §8.6, and confirms the Genesis Rain reaches **precisely zero**.
+
+But the closure is exact rather than comfortable, and that deserves saying plainly:
+
+- **Bloom #3,651 reverts.** There is nothing left to burn. The collection is capped at 3,650 by the
+  economics, not by a counter — which is elegant, but it means the cap is real and hard.
+- **A skipped day leaves dust forever.** If the job misses a day and is never backfilled, the Rain ends
+  at 100 rather than 0 and the tenth-anniversary story is off by one card.
+
+There is no slack in the design. That is a deliberate consequence of making the fee finite, but it makes
+the backfill job ([§9.2, W8](#92-the-workstreams)) load-bearing rather than a convenience.
+
+### 8.12 Signing transactions — without ever exposing a private key
 
 Azure Key Vault supports EC keys on curve **P-256K (secp256k1)** — precisely Ethereum's curve. The
 Treasury key is created **inside Key Vault**, non-exportable, and transactions are signed through the Key
@@ -1097,7 +1142,7 @@ Vault API using the managed identity (`Key Vault Crypto User`). **The private ke
 and exists nowhere in the code, the environment, or the logs.**
 *(Simpler fallback if needed: private key as a Key Vault secret — weaker, but acceptable on testnet.)*
 
-### 8.11 Pipeline integration
+### 8.13 Pipeline integration
 
 After the asmDB write, the job calls `mintCard(serial, cardHash, tokenURI)`. The transaction hash,
 `tokenId` and block number are written to the card's **`part = 8` row** — which is exactly why that slot
@@ -1106,7 +1151,7 @@ was reserved in [§4.3](#43-why-one-row-is-not-enough--and-the-fix).
 Minting is **decoupled and replayable**: if the chain is unavailable the card still exists in asmDB, and
 a catch-up job mints the backlog. **The blockchain must never block the card of the day.**
 
-### 8.12 Decentralised storage (option)
+### 8.14 Decentralised storage (option)
 
 Pin the PNGs to **IPFS** (via an open-source pinning service) and point `tokenURI` there, so the NFT
 survives the app disappearing. Planned as an opt-in, not a dependency.
