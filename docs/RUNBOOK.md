@@ -42,24 +42,53 @@ az account set --subscription <SUBSCRIPTION_ID>
 
 **You run this, not the agent.** The token never appears in a prompt, a log or a commit.
 
+> ### Why this is not Key Vault
+>
+> It was, until deployment. A **management-group policy** in this tenant —
+> `KeyVault_PublicNetwork_Modify`, from the `MCAPSGovDeployPolicies` assignment — forces
+> `publicNetworkAccess: Disabled` on **every** Key Vault. Our Bicep asked for `Enabled`; the policy
+> reverted it within ten seconds of being set.
+>
+> Reaching the vault would need a private endpoint **plus** a VNet-injected Container Apps
+> environment — and an environment's VNet configuration is **immutable**, so that means deleting and
+> recreating it, at roughly 5× the running cost. An APIM in front would not help: it fronts HTTP
+> APIs and does not proxy the Key Vault data plane, so `az keyvault secret set` would still be
+> refused.
+>
+> So the secret lives as a **Container Apps secret** instead: encrypted at rest by the platform,
+> never returned by the control plane in a template deployment, and kept out of deployment history
+> by `@secure()`. The honest trade-off is that there is no central rotation or audit trail, and
+> anyone with Contributor on the app can read it back.
+
 ```powershell
 $token = Read-Host 'asmDB bearer token' -AsSecureString
 $plain = [System.Net.NetworkCredential]::new('', $token).Password
-az keyvault secret set `
-  --vault-name kv-pixelslime-dedh2k35j5 `
-  --name asmdb-bearer-token `
-  --value $plain --only-show-errors --output none
+az containerapp secret set `
+  --name ca-pixelslime-api --resource-group FGI-ASMDBPIXELSMILES `
+  --secrets "asmdb-bearer-token=$plain" --only-show-errors --output none
 Remove-Variable token, plain
 ```
 
-Confirm it landed without printing it:
+The daily job needs the same secret:
 
 ```powershell
-az keyvault secret show --vault-name kv-pixelslime-dedh2k35j5 --name asmdb-bearer-token --query id -o tsv
+$token = Read-Host 'asmDB bearer token' -AsSecureString
+$plain = [System.Net.NetworkCredential]::new('', $token).Password
+az containerapp job secret set `
+  --name caj-pixelslime-daily --resource-group FGI-ASMDBPIXELSMILES `
+  --secrets "asmdb-bearer-token=$plain" --only-show-errors --output none
+Remove-Variable token, plain
 ```
 
-Your account already holds `Key Vault Secrets Officer` on the vault. If it reports `Forbidden`, the
-role assignment is still propagating — wait a minute and retry.
+Confirm it exists without printing it:
+
+```powershell
+az containerapp secret list --name ca-pixelslime-api --resource-group FGI-ASMDBPIXELSMILES --query "[].name" -o tsv
+```
+
+> ⚠️ **Bicep is declarative, so a redeploy that omits a secret removes it.** `deploy.ps1` reads the
+> current values back and passes them through for exactly this reason — otherwise a routine image
+> bump would silently unauthenticate the app against asmDB and the gallery would quietly go empty.
 
 ---
 
@@ -147,12 +176,15 @@ explicit log line. To arm it:
 ```powershell
 $t = Read-Host 'admin token' -AsSecureString
 $p = [System.Net.NetworkCredential]::new('', $t).Password
-az keyvault secret set --vault-name kv-pixelslime-dedh2k35j5 --name admin-token --value $p --only-show-errors --output none
+az containerapp secret set --name ca-pixelslime-api --resource-group FGI-ASMDBPIXELSMILES `
+  --secrets "admin-token=$p" --only-show-errors --output none
+az containerapp update --name ca-pixelslime-api --resource-group FGI-ASMDBPIXELSMILES `
+  --set-env-vars "ADMIN_TOKEN=secretref:admin-token" --only-show-errors --output none
 Remove-Variable t, p
 ```
 
-No redeploy is needed — the admin token resolves through Key Vault on its own ladder, independent of
-how the bearer was obtained.
+The admin token resolves on its own ladder, independent of how the bearer was obtained, so arming it
+never risks the bearer path.
 
 ### Backfill a missed day
 

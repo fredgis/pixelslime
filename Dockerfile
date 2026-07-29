@@ -17,7 +17,11 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
-COPY contracts/ ../contracts/
+
+# The design preview imports the reference card, and the prebuild hook materialises it
+# from the canonical copy rather than from a second one committed to git. The script
+# resolves it two levels up from frontend/scripts, which is / inside this stage.
+COPY assets/template/mochibo.png /assets/template/mochibo.png
 
 # VITE_USE_MOCK must be false here. The mock is constant-folded out of the
 # bundle, and shipping it would put a fake API in production.
@@ -36,16 +40,12 @@ WORKDIR /install
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY backend/pyproject.toml ./
-# Install dependencies only, without the project itself, so this layer survives
-# any change to application code.
-RUN python - <<'PY' > /tmp/requirements.txt
-import tomllib, pathlib
-cfg = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
-deps = cfg["project"]["dependencies"] + cfg["project"]["optional-dependencies"]["chain"]
-print("\n".join(deps))
-PY
-RUN pip install -r /tmp/requirements.txt
+# Install from a generated requirements file rather than parsing pyproject in the
+# image: the layer stays cacheable and the build does not depend on a TOML parser
+# or a heredoc surviving. scripts/sync_requirements.py keeps the two in step and
+# CI runs it with --check.
+COPY backend/requirements.txt ./
+RUN pip install -r requirements.txt
 
 
 # ── stage 3: runtime ──────────────────────────────────────────────────────────

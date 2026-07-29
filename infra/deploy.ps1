@@ -35,6 +35,29 @@ if ($Location) {
     $parameters += "location=$Location"
 }
 
+# Secrets live as Container Apps secrets, not Key Vault references: a management-group
+# policy forces publicNetworkAccess: Disabled on every vault in this tenant, and reaching
+# one privately would mean recreating the Container Apps environment, whose VNet config is
+# immutable.
+#
+# Bicep is declarative, so a redeploy that omits a secret REMOVES it. Read the current
+# values back and pass them through, otherwise a routine image bump silently unauthenticates
+# the app against asmDB and the site starts returning empty galleries.
+$appName = 'ca-pixelslime-api'
+foreach ($secret in @(
+    @{ Name = 'asmdb-bearer-token'; Param = 'asmdbBearerToken'; Label = 'asmDB bearer token' },
+    @{ Name = 'admin-token';        Param = 'adminToken';       Label = 'admin token' }
+)) {
+    $existing = az containerapp secret show `
+        --name $appName --resource-group $ResourceGroup `
+        --secret-name $secret.Name --query value -o tsv 2>$null
+    if ($LASTEXITCODE -eq 0 -and $existing) {
+        Write-Host ("  preserving existing {0}" -f $secret.Label)
+        $parameters += "$($secret.Param)=$existing"
+    }
+    $global:LASTEXITCODE = 0
+}
+
 Write-Host 'Compiling Bicep...'
 az bicep build --file $templateFile --stdout | Out-Null
 if ($LASTEXITCODE -ne 0) {

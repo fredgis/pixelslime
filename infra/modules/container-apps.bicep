@@ -21,9 +21,6 @@ param applicationInsightsName string
 @description('Name of the platform user-assigned managed identity.')
 param managedIdentityName string
 
-@description('Name of the platform Key Vault.')
-param keyVaultName string
-
 @description('Name of the platform Storage account.')
 param storageAccountName string
 
@@ -42,8 +39,31 @@ param containerImageTag string
 @description('Whether the public Microsoft quickstart image is being deployed.')
 param deployPlaceholderImage bool
 
+@description('''
+asmDB bearer token, stored as a Container Apps secret rather than a Key Vault reference.
+
+A management-group policy (KeyVault_PublicNetwork_Modify, assignment MCAPSGovDeployPolicies)
+forces publicNetworkAccess: Disabled on every Key Vault in this tenant. It reverted our
+Bicep's `Enabled` within ten seconds. Reaching the vault would therefore need a private
+endpoint plus a VNet-injected Container Apps environment - and an environment's VNet
+configuration is immutable, so that means deleting and recreating it.
+
+Container Apps encrypts this value at rest, it is never returned by the control plane in
+a template deployment, and @secure() keeps it out of deployment history. The optional
+admin token follows the same path for the same reason.
+
+Leave empty to preserve whatever is already set on the app; deploy.ps1 reads the existing
+value back and passes it through, so a redeploy never silently wipes the secret.
+''')
+@secure()
+param asmdbBearerToken string = ''
+
+@description('Optional admin token guarding POST /api/admin/generate. Empty leaves it disabled.')
+@secure()
+param adminToken string = ''
+
 var asmDbSecretName = 'asmdb-bearer-token'
-var asmDbSecretUrl = '${keyVault.properties.vaultUri}secrets/${asmDbSecretName}'
+var adminSecretName = 'admin-token'
 var containerImage = deployPlaceholderImage
   ? placeholderImage
   : '${registry.properties.loginServer}/${imageRepositoryName}:${containerImageTag}'
@@ -51,10 +71,6 @@ var commonEnvironmentVariables = [
   {
     name: 'AZURE_CLIENT_ID'
     value: managedIdentity.properties.clientId
-  }
-  {
-    name: 'KEY_VAULT_URI'
-    value: keyVault.properties.vaultUri
   }
   {
     name: 'STORAGE_ACCOUNT_NAME'
@@ -65,24 +81,47 @@ var commonEnvironmentVariables = [
     value: applicationInsights.properties.ConnectionString
   }
 ]
-var runtimeEnvironmentVariables = concat(commonEnvironmentVariables, [
-  {
-    name: 'ASMDB_BEARER_TOKEN'
-    secretRef: asmDbSecretName
-  }
-])
+var bearerEnvironmentVariable = empty(asmdbBearerToken)
+  ? []
+  : [
+      {
+        name: 'ASMDB_BEARER_TOKEN'
+        secretRef: asmDbSecretName
+      }
+    ]
+var adminEnvironmentVariable = empty(adminToken)
+  ? []
+  : [
+      {
+        name: 'ADMIN_TOKEN'
+        secretRef: adminSecretName
+      }
+    ]
+var runtimeEnvironmentVariables = concat(
+  commonEnvironmentVariables,
+  bearerEnvironmentVariable,
+  adminEnvironmentVariable
+)
 var containerEnvironmentVariables = deployPlaceholderImage
   ? commonEnvironmentVariables
   : runtimeEnvironmentVariables
-var keyVaultSecrets = deployPlaceholderImage
+var bearerSecret = empty(asmdbBearerToken)
   ? []
   : [
       {
         name: asmDbSecretName
-        identity: managedIdentity.id
-        keyVaultUrl: asmDbSecretUrl
+        value: asmdbBearerToken
       }
     ]
+var adminSecret = empty(adminToken)
+  ? []
+  : [
+      {
+        name: adminSecretName
+        value: adminToken
+      }
+    ]
+var appSecrets = deployPlaceholderImage ? [] : concat(bearerSecret, adminSecret)
 var registries = deployPlaceholderImage
   ? []
   : [
@@ -102,10 +141,6 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: managedIdentityName
-}
-
-resource keyVault 'Microsoft.KeyVault/vaults@2025-05-01' existing = {
-  name: keyVaultName
 }
 
 resource registry 'Microsoft.ContainerRegistry/registries@2025-11-01' existing = {
@@ -153,7 +188,7 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
         ]
       }
       registries: registries
-      secrets: keyVaultSecrets
+      secrets: appSecrets
     }
     template: {
       containers: [
@@ -210,7 +245,7 @@ resource dailyJob 'Microsoft.App/jobs@2025-07-01' = {
         replicaCompletionCount: 1
       }
       registries: registries
-      secrets: keyVaultSecrets
+      secrets: appSecrets
     }
     template: {
       containers: [

@@ -9,6 +9,26 @@ param containerImageTag string = 'latest'
 @description('Deploy the public Microsoft quickstart image until the pixelslime image is available.')
 param deployPlaceholderImage bool = true
 
+@description('''
+asmDB bearer token, stored as a Container Apps secret rather than a Key Vault reference.
+
+A management-group policy (KeyVault_PublicNetwork_Modify, assignment MCAPSGovDeployPolicies)
+forces publicNetworkAccess: Disabled on every Key Vault in this tenant - it reverted our
+Bicep's Enabled within ten seconds. Reaching the vault would need a private endpoint plus a
+VNet-injected Container Apps environment, and an environment's VNet configuration is
+immutable, so that means recreating it.
+
+@secure() keeps this out of deployment history. Leave empty to preserve whatever is already
+set on the app: deploy.ps1 reads the existing value back and passes it through, so a
+redeploy never silently wipes the secret.
+''')
+@secure()
+param asmdbBearerToken string = ''
+
+@description('Optional admin token guarding POST /api/admin/generate. Empty leaves it disabled.')
+@secure()
+param adminToken string = ''
+
 // Key Vault and Storage names cannot fit the full 13-character uniqueString value.
 var uniqueSuffix = take(uniqueString(resourceGroup().id), 10)
 var identityName = 'id-pixelslime'
@@ -105,7 +125,8 @@ module containerApps 'modules/container-apps.bicep' = {
     logAnalyticsName: logAnalyticsName
     applicationInsightsName: applicationInsightsName
     managedIdentityName: identityName
-    keyVaultName: keyVaultName
+    asmdbBearerToken: asmdbBearerToken
+    adminToken: adminToken
     storageAccountName: storageAccountName
     registryName: containerRegistryName
     imageRepositoryName: imageRepositoryName
