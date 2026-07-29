@@ -112,7 +112,7 @@ Precisely:
 | Bits | Field | Values |
 |---|---|---|
 | `0..2` | `rarity` | `0` COMMON · `1` UNCOMMON · `2` RARE · `3` EPIC · `4` LEGENDARY · `5` MYTHIC |
-| `3..6` | `type` | index into the type table, §3.4 |
+| `3..6` | `type` | index into the type table, §3.5 |
 | `7` | `shiny` | `0` or `1` |
 
 ```python
@@ -124,16 +124,41 @@ shiny   = (packed >> 7)  & 0x01
 
 ### 3.3 `flags` (offset 22, `u16`)
 
-| Bit | Meaning |
+| Bits | Meaning |
 |---:|---|
 | 0 | has a companion animal |
 | 1 | has an accessory |
 | 2 | vision-verified |
 | 3 | anchored on-chain |
 | 4 | seed card (not produced by the daily job) |
-| 5..15 | reserved, **must be 0** in version 1 |
+| **5..10** | **`companion_id`** — 6 bits, index into the companion table (0..63). Meaningful only when bit 0 is set; **must be 0 when bit 0 is clear.** |
+| 11..15 | reserved, **must be 0** in version 1 |
 
-### 3.4 Enumerations
+```python
+packed = (bits0_4
+          | ((companion_id & 0x3F) << 5))
+companion_id = (packed >> 5) & 0x3F
+```
+
+> **Why this exists.** Without it, the specific companion is unrecoverable from the stream: only the
+> boolean survives, so a card read back from the database could say *"has a companion"* but never say
+> *which one*. W7 hit exactly that gap while building the profile endpoint. The reserved bits were
+> there for precisely this kind of omission.
+
+### 3.4 Display fields resolved from ids
+
+Three fields shown in the UI are **not stored as text** — they are looked up from the ids in the header.
+The tables are frozen alongside the enums in §3.5 and live in `contracts/lookups.json`.
+
+| Display field | Resolved from | Table |
+|---|---|---|
+| `biome` | `biome_id` | `biomes` |
+| `mood` | `mood_id` | `moods` |
+| `companion` | `companion_id` (flags bits 5..10), when bit 0 is set | `companions` |
+
+This is what keeps the card text budget spent on the fields that are genuinely free-form.
+
+### 3.5 Enumerations
 
 Ordinals are **frozen**. Never reorder; only append.
 
@@ -143,7 +168,7 @@ type   : FAIRY FOREST WATER EMBER STORM STONE SUGAR GHOST
          METAL COSMIC BLOOM FROST SLUDGE BEAM PAPER DREAM
 ```
 
-### 3.5 Body — the text bundle
+### 3.6 Body — the text bundle
 
 Five text fields are joined with a single **`0x1F`** (unit separator) in this exact order:
 
@@ -166,7 +191,7 @@ body = c.compress(joined) + c.flush()
 > **The dictionary is the whole trick.** On strings this short, DEFLATE alone barely helps. Primed with
 > the PixelSlime vocabulary it typically saves 35–50 %, which is what lets the median card fit in one row.
 
-### 3.6 Field length limits
+### 3.7 Field length limits
 
 Enforced at **encode** time. Exceeding any of them is an error, never a truncation.
 
@@ -251,7 +276,7 @@ An implementation is correct only if all of these hold.
 1. **Round-trip.** `decode(encode(card)) == card` over the **encoded fields only**, for every fixture in
    `contracts/cards/` and for 10,000 randomly generated valid cards.
 
-   > **Encoded fields are exactly those listed in §3.1 and §3.5.** `biome` and `companion` are
+   > **Encoded fields are exactly those listed in §3.1 and §3.6.** `biome` and `companion` are
    > **display-only**: `contracts/card.schema.json` marks them "NOT encoded in PSC-1", they never enter
    > the stream, and they are therefore unrecoverable by definition. An implementation must drop them
    > when constructing the canonical `Card`, so that round-trip equality is well defined.

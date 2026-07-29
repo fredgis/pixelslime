@@ -53,6 +53,9 @@ def text_field(char_max: int, byte_max: int) -> st.SearchStrategy[str]:
 @st.composite
 def cards(draw: st.DrawFn) -> Card:
     """Generate a schema- and byte-limit-valid :class:`Card`."""
+    has_companion = draw(st.booleans())
+    # §3.3: companion_id is meaningful only with the flag, and must be 0 without it.
+    companion_id = draw(st.integers(min_value=0, max_value=63)) if has_companion else 0
     return Card(
         serial=draw(st.integers(min_value=1, max_value=65535)),
         name=draw(text_field(18, 36)),
@@ -78,11 +81,12 @@ def cards(draw: st.DrawFn) -> Card:
         mint_day=draw(st.integers(min_value=0, max_value=65535)),
         shiny=draw(st.booleans()),
         flags=Flags(
-            has_companion=draw(st.booleans()),
+            has_companion=has_companion,
             has_accessory=draw(st.booleans()),
             verified=draw(st.booleans()),
             on_chain=draw(st.booleans()),
             seed=draw(st.booleans()),
         ),
+        companion_id=companion_id,
         art_sha=draw(st.from_regex(r"[0-9a-f]{8}", fullmatch=True)),
     )

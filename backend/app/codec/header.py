@@ -2,12 +2,13 @@
 
 This module owns the byte-exact layout from ``docs/CODEC.md`` §3.1 and the two
 packed words that need bit surgery: ``flags_rarity_type`` at offset 7 (rarity in
-bits 0-2, type in bits 3-6, shiny in bit 7) and the ``flags`` word at offset 22.
-It knows nothing about compression or Z85 — it just turns a struct of integers
-into 32 deterministic little-endian bytes and back, failing loudly on a bad
-magic, version, reserved bit or out-of-range enum. The ``crc16`` field is packed
-last and computed by the caller over ``prefix`` + body, so this module exposes the
-30-byte ``prefix`` separately.
+bits 0-2, type in bits 3-6, shiny in bit 7) and the ``flags`` word at offset 22
+(five semantic bits 0-4, the 6-bit ``companion_id`` in bits 5-10, bits 11-15
+reserved). It knows nothing about compression or Z85 — it just turns a struct of
+integers into 32 deterministic little-endian bytes and back, failing loudly on a
+bad magic, version, reserved bit or out-of-range enum. The ``crc16`` field is
+packed last and computed by the caller over ``prefix`` + body, so this module
+exposes the 30-byte ``prefix`` separately.
 """
 
 from __future__ import annotations
@@ -60,6 +61,7 @@ class Header:
     verified: bool
     on_chain: bool
     seed: bool
+    companion_id: int
     mint_day: int
     art_sha: bytes
     crc16: int = 0
@@ -74,6 +76,7 @@ class Header:
             | ((self.verified & 1) << 2)
             | ((self.on_chain & 1) << 3)
             | ((self.seed & 1) << 4)
+            | ((self.companion_id & 0x3F) << 5)
         )
 
     def prefix(self) -> bytes:
@@ -141,8 +144,15 @@ class Header:
         if rarity > _MAX_RARITY:
             raise HeaderError(f"undefined rarity ordinal {rarity}")
 
-        if flags_word >> 5:
+        # Bits 11..15 are reserved and must be 0 in version 1 (§3.3).
+        if flags_word >> 11:
             raise HeaderError(f"reserved flag bits must be 0, got 0x{flags_word:04x}")
+        has_companion = bool(flags_word & 0x01)
+        companion_id = (flags_word >> 5) & 0x3F
+        if companion_id and not has_companion:
+            raise HeaderError(
+                f"companion_id {companion_id} set while has_companion is clear (§3.3)"
+            )
 
         return cls(
             serial=serial,
@@ -163,11 +173,12 @@ class Header:
             background_id=background_id,
             biome_id=biome_id,
             mood_id=mood_id,
-            has_companion=bool(flags_word & 0x01),
+            has_companion=has_companion,
             has_accessory=bool((flags_word >> 1) & 0x01),
             verified=bool((flags_word >> 2) & 0x01),
             on_chain=bool((flags_word >> 3) & 0x01),
             seed=bool((flags_word >> 4) & 0x01),
+            companion_id=companion_id,
             mint_day=mint_day,
             art_sha=art_sha,
             crc16=crc16,

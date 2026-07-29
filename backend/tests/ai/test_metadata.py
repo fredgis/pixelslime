@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 import respx
-from _helpers import chat_response, metadata_payload
+from _ai_helpers import chat_response, metadata_payload
 from conftest import CHAT_URL
 
 from app.ai.config import TEXT_MODEL

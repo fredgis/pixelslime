@@ -5,11 +5,12 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from _helpers import FIXTURE_NAMES, load_card
+from _codec_helpers import FIXTURE_NAMES, load_card
 
 from app.codec import (
     Card,
     CodecError,
+    CompanionError,
     CrcError,
     FieldLimitError,
     HeaderError,
@@ -219,10 +220,46 @@ def test_crc_detects_body_byte_flip() -> None:
 def test_reserved_flag_bits_rejected_on_decode() -> None:
     card = load_card("mochibo")
     stream = bytearray(encode_stream(card))
-    stream[22] |= 1 << 5  # set a reserved flag bit inside the header
+    stream[23] |= 1 << 3  # flags bit 11 (reserved) lives in the high byte
     rows = _split_rows(bytes(stream), serial=card.serial, mint_day=card.mint_day)
     with pytest.raises(HeaderError):
         decode(rows)
+
+
+@pytest.mark.parametrize("companion_id", range(64))
+def test_companion_id_roundtrips_all_64_values(companion_id: int) -> None:
+    base = load_card("mochibo")  # mochibo has has_companion == True
+    assert base.flags.has_companion is True
+    card = base.model_copy(update={"companion_id": companion_id})
+    decoded = decode(encode(card))
+    assert decoded.companion_id == companion_id
+    assert decoded == card
+
+
+def test_companion_id_zero_without_flag_is_valid() -> None:
+    card = load_card("worstcase-unseen")  # has_companion False, companion_id defaults to 0
+    assert card.flags.has_companion is False
+    assert card.companion_id == 0
+    assert decode(encode(card)).companion_id == 0
+
+
+def test_companion_id_set_without_flag_raises() -> None:
+    data = load_card("mochibo").model_dump()
+    data["flags"] = {**data["flags"], "has_companion": False}
+    data["companion_id"] = 7
+    with pytest.raises(CompanionError):
+        Card.model_validate(data)
+
+
+def test_companion_error_is_a_codec_error() -> None:
+    assert issubclass(CompanionError, CodecError)
+
+
+def test_companion_id_out_of_range_rejected() -> None:
+    base = load_card("mochibo").model_dump()
+    for bad in (-1, 64):
+        with pytest.raises(ValueError):
+            Card.model_validate({**base, "companion_id": bad})
 
 
 def test_over_long_char_field_raises_not_truncates() -> None:

@@ -18,6 +18,7 @@ from .codec import card_hash, decode, encode, encode_stream
 from .errors import (
     BodyError,
     CodecError,
+    CompanionError,
     CrcError,
     DictionaryError,
     FieldLimitError,
@@ -33,6 +34,7 @@ __all__ = [
     "BodyError",
     "Card",
     "CodecError",
+    "CompanionError",
     "CrcError",
     "DictionaryError",
     "FieldLimitError",

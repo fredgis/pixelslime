@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
-from _helpers import (
+from _ai_helpers import (
     image_edits_response,
     make_white_bordered_png,
     tiny_png,

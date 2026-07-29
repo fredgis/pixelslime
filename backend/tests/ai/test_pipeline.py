@@ -6,7 +6,7 @@ from pathlib import Path
 
 import httpx
 import respx
-from _helpers import (
+from _ai_helpers import (
     chat_response,
     image_edits_response,
     make_card_png,

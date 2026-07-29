@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from _helpers import cards
+from _codec_helpers import cards
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -24,6 +24,7 @@ def test_encode_decode_roundtrip_preserves_every_field(card: Card) -> None:
     assert decoded.type == card.type
     assert decoded.shiny == card.shiny
     assert decoded.flags == card.flags
+    assert decoded.companion_id == card.companion_id
     assert decoded.art_sha == card.art_sha
     assert decoded.mint_day == card.mint_day
 

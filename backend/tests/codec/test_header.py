@@ -36,6 +36,7 @@ def _base_header(**overrides: object) -> Header:
         "verified": True,
         "on_chain": False,
         "seed": False,
+        "companion_id": 0,
         "mint_day": 400,
         "art_sha": bytes.fromhex("1a2b3c4d"),
     }
@@ -131,8 +132,36 @@ def test_unpack_rejects_bad_version() -> None:
 
 def test_unpack_rejects_reserved_flag_bits() -> None:
     raw = bytearray(_base_header().pack())
-    # Set flags bit 5 (reserved) — must be rejected in version 1.
-    word = struct.unpack("<H", bytes(raw[22:24]))[0] | (1 << 5)
+    # Set flags bit 11 (reserved) — must be rejected in version 1.
+    word = struct.unpack("<H", bytes(raw[22:24]))[0] | (1 << 11)
+    raw[22:24] = struct.pack("<H", word)
+    with pytest.raises(HeaderError):
+        Header.unpack(bytes(raw))
+
+
+@pytest.mark.parametrize("companion_id", range(64))
+def test_companion_id_packs_into_bits_5_to_10(companion_id: int) -> None:
+    header = _base_header(has_companion=True, companion_id=companion_id)
+    (word,) = struct.unpack("<H", header.prefix()[22:24])
+    # companion_id lives in bits 5..10; bit 0 (has_companion) is set here.
+    assert (word >> 5) & 0x3F == companion_id
+    assert word & 0x01 == 1
+    back = Header.unpack(header.pack())
+    assert back.companion_id == companion_id
+    assert back.has_companion is True
+
+
+def test_companion_id_zero_with_flag_clear_roundtrips() -> None:
+    header = _base_header(has_companion=False, companion_id=0)
+    (word,) = struct.unpack("<H", header.prefix()[22:24])
+    assert (word >> 5) & 0x3F == 0
+    assert Header.unpack(header.pack()).companion_id == 0
+
+
+def test_unpack_rejects_companion_id_without_flag() -> None:
+    # Hand-build a header word with companion_id=1 but has_companion clear.
+    raw = bytearray(_base_header(has_companion=False, companion_id=0).pack())
+    word = struct.unpack("<H", bytes(raw[22:24]))[0] | (1 << 5)  # companion_id -> 1
     raw[22:24] = struct.pack("<H", word)
     with pytest.raises(HeaderError):
         Header.unpack(bytes(raw))

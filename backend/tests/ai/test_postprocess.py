@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import re
 
-from _helpers import make_card_png
+from _ai_helpers import make_card_png
 from PIL import Image
 
 from app.ai.postprocess import dominant_palette, postprocess, trim_alpha

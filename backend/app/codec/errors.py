@@ -36,6 +36,15 @@ class FieldLimitError(CodecError):
     """A text field breaks a length limit or contains a forbidden control byte."""
 
 
+class CompanionError(CodecError):
+    """``companion_id`` is non-zero on a card whose ``has_companion`` flag is clear.
+
+    §3.3 makes the 6-bit ``companion_id`` meaningful only when flags bit 0 is set,
+    and requires it to be 0 otherwise. Violating that is a caller error, not
+    something to silently zero, so it raises rather than being coerced.
+    """
+
+
 class StreamTooLargeError(CodecError):
     """The serialised stream exceeds the 4-row (560-byte) ceiling."""
 

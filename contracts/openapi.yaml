@@ -57,9 +57,9 @@ paths:
                 required: [card, nextBloomAt, secondsUntilNext, dayNumber]
                 properties:
                   card:             { $ref: "#/components/schemas/Card" }
-                  nextBloomAt:      { type: string, format: date-time, description: Next 10:00 Europe/Paris, in UTC }
-                  secondsUntilNext: { type: integer }
-                  dayNumber:        { type: integer, description: How many slimes have bloomed so far }
+                  nextBloomAt:      { type: string, format: date-time, description: "**Authoritative.** Next 10:00 Europe/Paris, expressed in UTC. Clients should count down to this instant rather than trusting `secondsUntilNext`, which is only a convenience snapshot taken when the response was built and drifts as the response travels." }
+                  secondsUntilNext: { type: integer, description: "Convenience only, derived from `nextBloomAt` at response time. Not authoritative." }
+                  dayNumber:        { type: integer, description: "Bloom ordinal of the card in this response, i.e. how many slimes have bloomed up to and including it. Always equal to `card.dayNumber`." }
         "404":
           description: No card has bloomed today yet
           content:
@@ -75,7 +75,14 @@ paths:
         - { name: size,   in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 24 } }
         - { name: type,   in: query, schema: { $ref: "#/components/schemas/SlimeType" } }
         - { name: rarity, in: query, schema: { $ref: "#/components/schemas/Rarity" } }
-        - { name: sort,   in: query, schema: { type: string, enum: [newest, oldest, rarest, happiest], default: newest } }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [newest, oldest, rarest, happiest], default: newest }
+          description: >-
+            Sort order. **Every sort is tie-broken by `serial` descending**, so pagination is stable
+            and two implementations of this contract cannot page the same data in different orders.
+            `newest`/`oldest` sort by mint date, `rarest` by rarity ordinal, `happiest` by the
+            happiness stat.
         - { name: q,      in: query, schema: { type: string, maxLength: 40 }, description: Case-insensitive name search }
       responses:
         "200":
@@ -321,10 +328,13 @@ components:
         quote:       { type: string, maxLength: 40 }
         biome:     { type: string }
         companion: { type: string }
-        mintDate:  { type: string, format: date }
-        dayNumber: { type: integer }
+        mintDate: { type: string, format: date }
+        dayNumber: { type: integer, description: "This card's 1-based bloom ordinal - the nth slime ever to bloom. Distinct from `serial` only if a serial is ever skipped." }
         imageUrl:  { type: string }
         thumbUrl:  { type: string }
+        biome:     { type: string, nullable: true, description: "Display name resolved from `biome_id` through contracts/lookups.json." }
+        companion: { type: string, nullable: true, description: "Display name resolved from `companion_id` through contracts/lookups.json. **`null` when the card has no companion.**" }
+        onChain:   { type: boolean, description: "Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present." }
         palette:
           type: array
           description: Dominant colours of the artwork, so the UI can tint itself to the card.
@@ -332,6 +342,10 @@ components:
         chain:
           type: object
           nullable: true
+          description: >-
+            On-chain anchor. **Always present as a key; `null` when the card has not been anchored
+            yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to
+            distinguish absent from null.
           properties:
             tokenId:     { type: integer }
             txHash:      { type: string }

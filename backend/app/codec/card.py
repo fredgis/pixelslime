@@ -21,6 +21,8 @@ from typing import Annotated, Any, Literal, get_args
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
+from .errors import CompanionError
+
 Rarity = Literal["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC"]
 # fmt: off
 SlimeType = Literal[
@@ -93,6 +95,7 @@ class Card(BaseModel):
     mint_day: int = Field(ge=0, le=65535)
     shiny: bool = False
     flags: Flags = Field(default_factory=Flags)
+    companion_id: int = Field(default=0, ge=0, le=63)
     art_sha: str = Field(default="00000000", pattern=r"^[0-9a-f]{8}$")
 
     @model_validator(mode="before")
@@ -102,6 +105,20 @@ class Card(BaseModel):
         if isinstance(data, dict) and ("biome" in data or "companion" in data):
             return {k: v for k, v in data.items() if k not in ("biome", "companion")}
         return data
+
+    @model_validator(mode="after")
+    def _companion_id_requires_flag(self) -> Card:
+        """Enforce §3.3: ``companion_id`` must be 0 unless ``flags.has_companion`` is set.
+
+        Raises :class:`CompanionError` rather than silently zeroing, so a caller that
+        forgot to set the flag learns about it instead of losing the companion.
+        """
+        if self.companion_id and not self.flags.has_companion:
+            raise CompanionError(
+                f"companion_id is {self.companion_id} but has_companion is false; "
+                "it must be 0 when the card carries no companion (§3.3)"
+            )
+        return self
 
 
 class Row(BaseModel):

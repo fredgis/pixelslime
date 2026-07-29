@@ -133,6 +133,7 @@ def _header_for(card: Card, total_len: int) -> Header:
         verified=card.flags.verified,
         on_chain=card.flags.on_chain,
         seed=card.flags.seed,
+        companion_id=card.companion_id,
         mint_day=card.mint_day,
         art_sha=bytes.fromhex(card.art_sha),
     )
@@ -294,6 +295,7 @@ def decode(rows: list[Row]) -> Card:
             on_chain=header.on_chain,
             seed=header.seed,
         ),
+        "companion_id": header.companion_id,
         "art_sha": header.art_sha.hex(),
     }
     try:

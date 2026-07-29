@@ -1,0 +1,27 @@
+[
+  {
+    "route": "/",
+    "total": 0,
+    "violations": []
+  },
+  {
+    "route": "/dex",
+    "total": 0,
+    "violations": []
+  },
+  {
+    "route": "/slime/14",
+    "total": 0,
+    "violations": []
+  },
+  {
+    "route": "/lab",
+    "total": 0,
+    "violations": []
+  },
+  {
+    "route": "/bank",
+    "total": 0,
+    "violations": []
+  }
+]

@@ -6,7 +6,7 @@ import io
 
 import httpx
 import respx
-from _helpers import chat_response, make_card_png, valid_card_dict, vision_payload
+from _ai_helpers import chat_response, make_card_png, valid_card_dict, vision_payload
 from conftest import CHAT_URL
 from PIL import Image
 

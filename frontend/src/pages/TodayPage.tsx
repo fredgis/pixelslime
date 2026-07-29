@@ -1,0 +1,198 @@
+/**
+ * ① TODAY'S BLOOM (`/`).
+ *
+ * The animated wordmark, a "✦ DAY n ✦" ribbon, a live countdown to the next 10:00
+ * Europe/Paris, and today's card face-down as a pulsing pixel card-back. Activating the
+ * card (click or keyboard) flips it in 3D with a particle burst; the page background
+ * adopts the card's palette, stat bars cascade in, and rarity ≥ EPIC earns a confetti
+ * volley and a gentle screen shake. Below sits the RECENTLY BLOOMED strip. Every effect
+ * is gated by the design system's useReducedMotion.
+ */
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  CardFlip,
+  Confetti,
+  Countdown,
+  PixelButton,
+  RARITY_ORDER,
+  RarityBadge,
+  Ribbon,
+  SlimeCard,
+  StatBar,
+  TypePill,
+  tokens,
+  useReducedMotion,
+  type ConfettiHandle,
+  type StatKey,
+} from '@/design';
+import { useCards, useToday } from '@/api/client';
+import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
+import { useAmbientStore } from '@/store/ambient';
+import { useDiscoveryStore } from '@/store/discovery';
+import { HeroTitle } from '@/components/HeroTitle';
+import { SmartImage } from '@/components/SmartImage';
+import { ErrorState, LoadingState } from '@/components/States';
+
+const EPIC_INDEX = RARITY_ORDER.indexOf('EPIC');
+
+export function TodayPage(): ReactElement {
+  const today = useToday();
+  const recent = useCards({ sort: 'newest', size: 8 });
+  const reduced = useReducedMotion();
+  const navigate = useNavigate();
+  const confettiRef = useRef<ConfettiHandle>(null);
+  const shakeRef = useRef<HTMLDivElement>(null);
+  const setTint = useAmbientStore((s) => s.setTint);
+  const discover = useDiscoveryStore((s) => s.discover);
+  const [revealed, setRevealed] = useState(false);
+
+  const data = today.data;
+  const card = data?.card;
+
+  useEffect(() => () => setTint(null), [setTint]);
+
+  const handleReveal = (): void => {
+    if (!card) return;
+    setRevealed(true);
+    discover(card.serial);
+    setTint(paletteBackground(card));
+    if (reduced) return;
+    const isCeremony = RARITY_ORDER.indexOf(card.rarity) >= EPIC_INDEX;
+    confettiRef.current?.fire({ x: 0.5, y: 0.42 });
+    if (isCeremony) {
+      window.setTimeout(() => confettiRef.current?.fire({ x: 0.32, y: 0.5 }), 140);
+      window.setTimeout(() => confettiRef.current?.fire({ x: 0.68, y: 0.5 }), 260);
+      shakeRef.current?.animate(
+        [
+          { transform: 'translateX(0)' },
+          { transform: 'translateX(-8px) rotate(-1deg)' },
+          { transform: 'translateX(7px) rotate(1deg)' },
+          { transform: 'translateX(-5px)' },
+          { transform: 'translateX(0)' },
+        ],
+        { duration: 520, easing: 'ease-in-out' },
+      );
+    }
+  };
+
+  if (today.isLoading) return <LoadingState label="Today’s bloom is opening…" />;
+  if (today.isError || !data || !card) {
+    return <ErrorState label="Today’s bloom hasn’t arrived." onRetry={() => void today.refetch()} />;
+  }
+
+  const stats: ReadonlyArray<[StatKey, number]> = [
+    ['strength', card.strength],
+    ['endurance', card.endurance],
+    ['agility', card.agility],
+    ['happiness', card.happiness],
+  ];
+
+  const recentItems = (recent.data?.items ?? []).filter((c) => c.serial !== card.serial).slice(0, 6);
+
+  return (
+    <div className="flex flex-col items-center gap-10">
+      <Confetti ref={confettiRef} />
+
+      <section className="ps-hero w-full">
+        <HeroTitle
+          text="PIXELSLIME"
+          eyebrow="PUNIPUNI PARADISE"
+          subtitle="TODAY’S BLOOM HAS ARRIVED"
+          rainbow={card.rarity === 'MYTHIC'}
+        />
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+          <Ribbon icon="✦" tone={tokens.color.bubblegum}>
+            DAY {data.dayNumber}
+          </Ribbon>
+          <Countdown target={new Date(data.nextBloomAt)} label="NEXT SLIME IN" />
+        </div>
+      </section>
+
+      <div ref={shakeRef} className="w-full max-w-[340px]">
+        <CardFlip
+          onReveal={handleReveal}
+          seal="✦ PIXEL RAIN ✦"
+          hint="CLICK OR PRESS ENTER"
+          revealedLabel={`${card.name}, ${card.rarity} ${card.type} — today’s bloom`}
+        >
+          <SmartImage
+            src={card.imageUrl}
+            thumb={card.thumbUrl}
+            alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
+            sizes="(max-width: 640px) 88vw, 340px"
+            eager
+          />
+        </CardFlip>
+      </div>
+
+      {revealed ? (
+        <section
+          className="w-full max-w-2xl rounded-xl border-4 border-ink bg-paper p-6 shadow-card animate-fade-up"
+          aria-label={`${card.name} details`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-pixel text-[20px] text-ink">{card.name}</h2>
+              <p className="mt-1 font-stat text-[12px] tracking-[2px] text-ink-soft">
+                {card.cardId} · LV {card.level} · {formatMintDate(card.mintDate)}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <RarityBadge rarity={card.rarity} />
+              <TypePill type={card.type} />
+            </div>
+          </div>
+
+          <p className="mt-4 font-round text-ink">{card.personality}</p>
+          <p className="mt-2 font-stat text-[13px] italic text-ink-soft">“{card.quote}”</p>
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            {stats.map(([stat, value], i) => (
+              <StatBar key={stat} stat={stat} value={value} index={i} />
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <PixelButton variant="sunbeam" onClick={() => navigate(`/slime/${card.serial}`)}>
+              See the 175 bytes →
+            </PixelButton>
+            <Link to="/dex" className="ps-focusable">
+              <PixelButton variant="ghost">Browse the SLIMEDEX</PixelButton>
+            </Link>
+          </div>
+        </section>
+      ) : (
+        <p className="max-w-md text-center font-stat text-[13px] tracking-[2px] text-ink-soft">
+          A brand-new slime blooms every day at 10:00 Paris time. Flip today’s card to meet it.
+        </p>
+      )}
+
+      <section className="w-full" aria-labelledby="recent-heading">
+        <h2 id="recent-heading" className="mb-4 text-center font-pixel text-[15px] text-ink">
+          RECENTLY BLOOMED
+        </h2>
+        {recentItems.length === 0 ? (
+          <p className="text-center font-stat text-[12px] tracking-[2px] text-ink-soft">
+            The garden is just getting started.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {recentItems.map((item, i) => (
+              <li key={item.serial}>
+                <SlimeCard
+                  card={toSlimeCardData(item)}
+                  index={i}
+                  isNew={i === 0}
+                  onOpen={(serial) => navigate(`/slime/${serial}`)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export default TodayPage;

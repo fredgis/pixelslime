@@ -1,0 +1,47 @@
+{
+  "_comment": "Frozen lookup tables. Ids are list indices and must never be reordered - only appended. Source of truth for biome/mood/companion display names, resolved from the ids in the PSC-1 header.",
+  "biomes": [
+    "Open Meadow",
+    "Sunlit Forest",
+    "Tide Pool Cove",
+    "Cozy Bedroom",
+    "Cozy Reading Room",
+    "Rainy Street",
+    "Cluttered Workshop",
+    "Library at Dusk",
+    "Mushroom Grove",
+    "Snowy Village",
+    "Candy Kitchen",
+    "Starlit Rooftop",
+    "Rockpool Cavern",
+    "Sunny Greenhouse",
+    "Arcade Corner",
+    "Cloud Terrace"
+  ],
+  "moods": [
+    "Cheerful",
+    "Sleepy",
+    "Curious",
+    "Mischievous",
+    "Serene",
+    "Excited",
+    "Bashful",
+    "Determined",
+    "Dreamy",
+    "Grumpy"
+  ],
+  "companions": [
+    "Sleepy Puff Cat",
+    "Tiny Sparrow",
+    "Bumble Bee Buddy",
+    "Pebble Crab",
+    "Glow Moth",
+    "Acorn Squirrel",
+    "Paper Crane",
+    "Bubble Fish",
+    "Clover Bunny",
+    "Ember Pup",
+    "Frost Fawn",
+    "Star Tadpole"
+  ]
+}

@@ -15,7 +15,7 @@ import base64
 import httpx
 import pytest
 import respx
-from _helpers import cassette_exists, load_cassette, make_card_png, valid_card_dict
+from _ai_helpers import cassette_exists, load_cassette, make_card_png, valid_card_dict
 from conftest import CHAT_URL
 
 from app.ai.metadata import generate_metadata

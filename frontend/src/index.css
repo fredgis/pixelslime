@@ -1,0 +1,12 @@
+/**
+ * App Tailwind entry.
+ *
+ * The W5 design system's globals.css is hand-written CSS (theme vars, `.ps-*`
+ * classes, keyframes) and deliberately contains no `@tailwind` directives — so the
+ * app must emit the utility layer itself. This mirrors the design system's own
+ * preview.entry.tsx, which loads preview-tailwind.css *before* globals.css so the
+ * design's base + `.ps-*` rules win any overlap with Tailwind's preflight.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
