@@ -10,10 +10,10 @@
 
 <br>
 
-[![Status](https://img.shields.io/badge/status-PLANNING-8B6FE8?style=for-the-badge)](docs/PLAN.md)
+[![Status](https://img.shields.io/badge/status-BUILT-7FE3C0?style=for-the-badge)](docs/RUNBOOK.md)
 [![Plan](https://img.shields.io/badge/read-the%20plan-FF8FC5?style=for-the-badge)](docs/PLAN.md)
-[![Mockup](https://img.shields.io/badge/see-the%20mockup-7FE3C0?style=for-the-badge)](docs/mockup/index.html)
-[![Card](https://img.shields.io/badge/card-1024%C3%971536%20PNG-FFD86B?style=for-the-badge)](assets/template/mochibo.png)
+[![Runbook](https://img.shields.io/badge/deploy-the%20runbook-8B6FE8?style=for-the-badge)](docs/RUNBOOK.md)
+[![Tests](https://img.shields.io/badge/tests-694%20backend%20%C2%B7%20113%20chain-FFD86B?style=for-the-badge)](#-verified-not-asserted)
 
 </div>
 
@@ -76,19 +76,44 @@ Every card exposes its own **provenance**: the exact packed bytes as they live i
 | Document | What it is |
 |---|---|
 | **[`docs/PLAN.md`](docs/PLAN.md)** | The complete plan — verified API facts, Azure architecture, the 175-byte codec, the AI pipeline, the $SMILE economy, and an 11-workstream split designed for parallel agents |
-| **[`docs/mockup/index.html`](docs/mockup/index.html)** | The clickable mockup. Open it in a browser — the card flips, the gallery filters, the economy is laid out |
+| **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** | **Deploying and operating it** — the remaining rollout steps, plus backfill, token rotation and troubleshooting |
+| **[`docs/CODEC.md`](docs/CODEC.md)** | The normative PSC-1 specification |
+| **[`docs/AGENTS.md`](docs/AGENTS.md)** | Workstream ownership, definition of done, and the gotchas that will bite you |
+| **[`docs/mockup/index.html`](docs/mockup/index.html)** | The original clickable mockup. Open it in a browser |
 
 <br>
 
-## 🗂 What's in the repo right now
+## 🗂 What's in the repo
 
 ```
-docs/PLAN.md                          the plan — read this first
-docs/mockup/index.html                the clickable mockup
-docs/assets/                          the screenshots above
-assets/template/mochibo.png           style reference card, RGBA with real alpha
-assets/template/mochibo-original.png  the original — RGB, with a checkerboard painted in
-scripts/clean_template.py             turns that checkerboard into a real alpha channel
+docs/            PLAN.md, RUNBOOK.md, CODEC.md, AGENTS.md, the mockup
+contracts/       card schema, openapi.yaml, PSC-1 fixtures, design tokens, lookups
+infra/           Bicep — identity, Key Vault, Storage, ACR, Container Apps, RBAC
+backend/app/     codec · asmdb · ai · api · core · storage · jobs · chain
+frontend/src/    design system + the five screens
+chain/           Foundry — SmileToken, PixelSlimeCard, ClaimPool, SlimeAdoption
+tests/e2e/       real frontend against real backend
+scripts/         template cleanup, dictionary build, contract validation
+Dockerfile       one image, two entrypoints: the API and the daily job
+```
+
+<br>
+
+## 🔬 Verified, not asserted
+
+| | |
+|---|---|
+| Backend | **694 tests**, `mypy --strict` clean across 66 modules |
+| Chain | **46 Solidity + 67 Python** tests; 3,650 blooms drain the Genesis Rain to exactly zero |
+| Frontend | **0 axe violations** on all five screens, ~80 KB gzipped initial load |
+| Integration | Real frontend against real backend; every response validated against the contract |
+| Codec | A whole Mochibo card fits in **65 of the 175 available bytes**, in a single row |
+
+```bash
+python scripts/validate_contracts.py   # contracts are internally consistent
+python scripts/verify_rows.py          # every emitted row is legal for asmDB
+cd backend && pytest tests             # 694 passed
+cd chain   && forge test               # 46 passed
 ```
 
 <details>

@@ -1,0 +1,18 @@
+# Generated from pyproject.toml by scripts/sync_requirements.py - do not edit by hand.
+# Exists so the Docker build has a stable, cacheable dependency layer that does not
+# depend on parsing pyproject inside the image.
+azure-identity>=1.19
+azure-keyvault-keys>=4.9
+azure-keyvault-secrets>=4.9
+azure-storage-blob>=12.24
+eth-account>=0.13
+eth-utils>=5.1
+fastapi>=0.115
+httpx>=0.28
+pillow>=11.0
+pydantic-settings>=2.7
+pydantic>=2.10
+structlog>=24.4
+tenacity>=9.0
+uvicorn[standard]>=0.32
+web3>=7.6

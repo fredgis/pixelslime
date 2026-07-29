@@ -16,6 +16,22 @@ jobs:
       - run: pip install jsonschema pyyaml
       - name: Validate every card fixture against the schema
         run: python scripts/validate_contracts.py
+      - name: requirements.txt is in step with pyproject.toml
+        run: python scripts/sync_requirements.py --check
+
+  image:
+    name: Container image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   backend:
     name: Backend

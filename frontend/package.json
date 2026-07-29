@@ -12,7 +12,10 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "gen:api": "openapi-typescript ../contracts/openapi.yaml -o src/api/schema.ts",
     "gen:images": "node scripts/prep-images.mjs",
-    "shot": "node scripts/screenshots.mjs"
+    "shot": "node scripts/screenshots.mjs",
+    "prepare:assets": "node scripts/copy-reference-card.mjs",
+    "prebuild": "npm run prepare:assets",
+    "predev": "npm run prepare:assets"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.7",
