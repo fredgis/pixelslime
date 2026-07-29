@@ -7,11 +7,12 @@ these touch the network — even ``raw_view`` re-derives the asmDB rows by *re-e
 the decoded card through the real codec, which is byte-identical to what asmDB
 stores (the codec is deterministic) and so needs no round-trip.
 
-Two schema fields are resolved from W4's frozen lookup tables
-(``contracts/lookups.json``): ``biome`` from ``biome_id`` and ``companion`` from
-``companion_id`` (only when ``flags.has_companion`` is set). ``mood`` is resolved
-from ``mood_id`` too; note it is not (yet) declared in the OpenAPI ``Card`` schema
-— see the W7 report. Ids out of range degrade to an omitted field.
+Three schema fields are resolved from W4's frozen lookup tables
+(``contracts/lookups.json``): ``biome`` from ``biome_id``, ``mood`` from ``mood_id``,
+and ``companion`` from ``companion_id`` (only when ``flags.has_companion`` is set).
+All three are declared ``nullable`` in the contract and are **always present as a
+key**: an out-of-range id, or a card with no companion, resolves to ``null`` rather
+than omitting the field, so the frontend can rely on a stable shape.
 """
 
 from __future__ import annotations
@@ -99,16 +100,11 @@ def card_detail(card: Card, *, day_number: int | None = None) -> dict[str, Any]:
     palette = contracts.palette_for(card.type, card.rarity)
     if palette:
         payload["palette"] = palette
-    biome = contracts.biome_name(card.biome_id)
-    if biome is not None:
-        payload["biome"] = biome
-    mood = contracts.mood_name(card.mood_id)
-    if mood is not None:
-        payload["mood"] = mood
-    if card.flags.has_companion:
-        companion = contracts.companion_name(card.companion_id)
-        if companion is not None:
-            payload["companion"] = companion
+    payload["biome"] = contracts.biome_name(card.biome_id)
+    payload["mood"] = contracts.mood_name(card.mood_id)
+    payload["companion"] = (
+        contracts.companion_name(card.companion_id) if card.flags.has_companion else None
+    )
     return payload
 
 

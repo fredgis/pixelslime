@@ -81,7 +81,7 @@ export function ProfilePage(): ReactElement {
           <header className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h1 className="font-pixel text-[24px] text-ink">{data.name}</h1>
-              {data.chain ? (
+              {data.onChain && data.chain ? (
                 <a
                   href={data.chain.explorerUrl}
                   target="_blank"
@@ -126,6 +126,7 @@ export function ProfilePage(): ReactElement {
 
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Fact label="BIOME" value={data.biome ?? '—'} />
+            <Fact label="MOOD" value={data.mood ?? '—'} />
             <Fact label="COMPANION" value={data.companion ?? '—'} />
             <Fact label="HOUSE" value={data.rarityHouse ?? tokens.rarity[data.rarity].house} />
             <Fact label="HEIGHT" value={`${data.height_mm} mm`} />

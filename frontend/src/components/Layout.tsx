@@ -22,12 +22,6 @@ export function Layout(): ReactElement {
 
   return (
     <div className="ps-surface min-h-screen">
-      <a
-        href="#main"
-        className="ps-focusable sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:border-4 focus:border-ink focus:bg-sunbeam focus:px-4 focus:py-2 focus:font-pixel focus:text-[11px] focus:text-ink"
-      >
-        Skip to content
-      </a>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-slow"
@@ -35,6 +29,12 @@ export function Layout(): ReactElement {
       />
       <BackgroundSlimes />
       <div className="relative z-10 flex min-h-screen flex-col">
+        <a
+          href="#main"
+          className="ps-focusable sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:border-4 focus:border-ink focus:bg-sunbeam focus:px-4 focus:py-2 focus:font-pixel focus:text-[11px] focus:text-ink"
+        >
+          Skip to content
+        </a>
         <Nav />
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
           <Outlet />

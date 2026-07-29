@@ -5,22 +5,38 @@
 disk, never return them in a response, never log them. This module is the only
 thing that reads the asmDB bearer and the admin token, and it hands neither back
 out: the bearer is used exactly once to build the asmDB client, and the admin
-token is only ever *compared* — in constant time — inside :meth:`SecretProvider.verify_admin`.
+token is only ever *compared* — in constant time — inside
+:meth:`SecretProvider.verify_admin`.
 
-Secrets resolve in a fixed order (W1's Bicep wires both mechanisms):
+The two secrets resolve on **independent** ladders, because they differ in
+criticality: the bearer is required, the admin token is optional.
 
-1. ``ASMDB_BEARER_TOKEN`` (and, if the admin endpoint is enabled, ``ADMIN_TOKEN``)
-   straight from the environment **whenever the bearer is present**. In production
-   Container Apps has already resolved the Key Vault ``secretRef`` into the env var
-   using the managed identity before the process starts, so the boot path makes no
-   SDK call and cannot be tripped by a momentarily-unreachable vault. Locally a
-   developer sets the same vars — the *same* code path, deliberately.
-2. Otherwise, read from Key Vault directly via ``DefaultAzureCredential`` using
-   ``KEY_VAULT_URI`` — the fallback for any host that does not pre-inject secrets.
-3. Otherwise fail closed with a clear error.
+asmDB bearer (required — fail *closed*):
 
-``LOCAL_DEV`` / ``FAKE_BACKEND`` only select the in-memory backend; they no longer
-gate where the bearer comes from.
+1. ``ASMDB_BEARER_TOKEN`` from the environment whenever present. In production
+   Container Apps resolves the Key Vault ``secretRef`` into this env var before the
+   process starts, so the boot path makes no SDK call and cannot be tripped by a
+   momentarily-unreachable vault. Locally a developer sets the same var.
+2. Otherwise Key Vault directly via ``DefaultAzureCredential`` using ``KEY_VAULT_URI``.
+3. Otherwise fail closed — refuse to start rather than serve unauthenticated.
+
+Admin token (optional — fail *safe*, never crash the site over it):
+
+1. ``ADMIN_TOKEN`` from the environment, if present.
+2. Otherwise Key Vault (``KEY_VAULT_URI`` + ``ADMIN_TOKEN_SECRET_NAME``) if both are
+   configured. Because the bearer usually comes from the environment, this is
+   typically the only boot-time Key Vault read — and a missing secret or an
+   unreachable vault *disables* the endpoint rather than downing the public read
+   path.
+3. Otherwise the endpoint is disabled.
+
+Either way the admin state is logged with exactly one explicit line at startup
+(``admin_generation_enabled`` / ``admin_generation_disabled`` with a reason), so a
+disabled control is never a silent state. Disabled always means the route returns
+401; it is never left unguarded.
+
+``LOCAL_DEV`` / ``FAKE_BACKEND`` only select the in-memory backend; in that mode
+both secrets simply read the environment and no Key Vault call is made.
 """
 
 from __future__ import annotations
@@ -79,66 +95,106 @@ class SecretProvider:
         return _secrets.compare_digest(presented.encode("utf-8"), self._admin_token.encode("utf-8"))
 
 
-def _from_env(settings: Settings) -> SecretProvider:
-    """Source both secrets from environment variables — the primary path.
+async def _read_bearer_from_key_vault(vault_url: str, secret_name: str) -> str:
+    """Fetch the required asmDB bearer from Key Vault; a failure here fails startup.
 
-    In production Container Apps resolves the Key Vault ``secretRef`` for the bearer
-    (and ``ADMIN_TOKEN`` when the admin endpoint is enabled) into the environment
-    before startup; locally a developer sets the same vars. Either way there is no
-    Key Vault SDK call on the boot path.
+    The bearer is non-optional, so any error (vault unreachable, secret missing)
+    propagates and aborts boot — better a loud failed startup than a service that
+    silently cannot talk to asmDB.
     """
-    bearer = os.environ.get(_ASMDB_BEARER_ENV)
-    admin = os.environ.get(_ADMIN_TOKEN_ENV)
-    _log.info(
-        "secrets_from_env",
-        asmdb_bearer_present=bearer is not None,
-        admin_token_present=admin is not None,
-    )
-    return SecretProvider(asmdb_bearer=bearer, admin_token=admin)
-
-
-async def _from_key_vault(settings: Settings) -> SecretProvider:
-    """Source secrets from Key Vault using the managed identity, at startup."""
-    if settings.key_vault_url is None:
-        raise SecretError("KEY_VAULT_URI or KEY_VAULT_NAME must be set to read from Key Vault")
-
-    # Imported lazily so the fake/local path never needs the Azure SDK installed.
-    from azure.core.exceptions import ResourceNotFoundError
     from azure.identity.aio import DefaultAzureCredential
     from azure.keyvault.secrets.aio import SecretClient
 
     async with (
         DefaultAzureCredential() as credential,
-        SecretClient(vault_url=settings.key_vault_url, credential=credential) as client,
+        SecretClient(vault_url=vault_url, credential=credential) as client,
     ):
-        bearer_secret = await client.get_secret(settings.asmdb_secret_name)
-        admin_token: str | None = None
-        if settings.admin_token_secret_name:
-            try:
-                admin_secret = await client.get_secret(settings.admin_token_secret_name)
-                admin_token = admin_secret.value
-            except ResourceNotFoundError:
-                _log.info("admin_secret_absent", secret_name=settings.admin_token_secret_name)
-    _log.info("secrets_from_key_vault", admin_enabled=admin_token is not None)
-    return SecretProvider(asmdb_bearer=bearer_secret.value, admin_token=admin_token)
+        secret = await client.get_secret(secret_name)
+    value = secret.value
+    if value is None:
+        raise SecretError("asmDB bearer secret in Key Vault has no value")
+    _log.info("bearer_from_key_vault")
+    return value
+
+
+async def _read_admin_from_key_vault(vault_url: str, secret_name: str) -> tuple[str | None, str]:
+    """Fetch the *optional* admin token from Key Vault, returning ``(token, reason)``.
+
+    Never raises: the admin endpoint is optional, so a missing secret or an
+    unreachable vault disables it (``None`` plus a short reason) instead of taking
+    the public read path down. The reason is a non-secret string for the startup log.
+    """
+    from azure.core.exceptions import AzureError, ResourceNotFoundError
+    from azure.identity.aio import DefaultAzureCredential
+    from azure.keyvault.secrets.aio import SecretClient
+
+    try:
+        async with (
+            DefaultAzureCredential() as credential,
+            SecretClient(vault_url=vault_url, credential=credential) as client,
+        ):
+            secret = await client.get_secret(secret_name)
+            value = secret.value
+    except ResourceNotFoundError:
+        return None, f"admin secret {secret_name!r} not present in Key Vault"
+    except AzureError as exc:
+        _log.warning("admin_secret_unreadable", error=type(exc).__name__)
+        return None, "admin secret could not be read from Key Vault"
+    if value is None:
+        return None, f"admin secret {secret_name!r} in Key Vault has no value"
+    return value, "key-vault"
+
+
+async def _resolve_admin_token(settings: Settings, env_admin: str | None) -> tuple[str | None, str]:
+    """Admin-token ladder, independent of how the bearer was sourced.
+
+    Env first, then Key Vault (only when both the vault URI and the secret name are
+    configured), else disabled.
+    """
+    if env_admin:
+        return env_admin, "env"
+    if settings.key_vault_url is not None and settings.admin_token_secret_name:
+        return await _read_admin_from_key_vault(
+            settings.key_vault_url, settings.admin_token_secret_name
+        )
+    return None, "no ADMIN_TOKEN in the environment and no Key Vault admin secret configured"
+
+
+def _announce_admin_state(admin_token: str | None, reason: str) -> None:
+    """Log exactly one explicit line about the admin endpoint, so it is never silent."""
+    if admin_token is None:
+        _log.warning("admin_generation_disabled", reason=reason)
+    else:
+        _log.info("admin_generation_enabled", source=reason)
 
 
 async def load_secrets(settings: Settings) -> SecretProvider:
-    """Resolve secrets: env bearer first, then Key Vault, then fail closed.
+    """Resolve the two secrets on independent ladders (see the module docstring).
 
-    The fake backend needs no real bearer, so it short-circuits to the (optional)
-    env values. Otherwise a bearer already in the environment wins — this is both
-    the production path (Container Apps injected it from Key Vault before startup,
-    so no SDK call) and the local path. Only a host that pre-injects nothing reads
-    Key Vault directly; if even that is unconfigured we refuse to start rather than
-    serve unauthenticated against asmDB.
+    The bearer fails closed (no bearer ⇒ refuse to start); the admin token fails
+    safe (unresolved ⇒ disabled and logged, never a crash). In fakes mode both
+    secrets simply read the environment and Key Vault is never contacted.
     """
+    env_bearer = os.environ.get(_ASMDB_BEARER_ENV)
+    env_admin = os.environ.get(_ADMIN_TOKEN_ENV)
+
     if settings.use_fakes:
-        return _from_env(settings)
-    if os.environ.get(_ASMDB_BEARER_ENV):
-        return _from_env(settings)
-    if settings.key_vault_url is not None:
-        return await _from_key_vault(settings)
-    raise SecretError(
-        "asmDB bearer unavailable: set ASMDB_BEARER_TOKEN, or KEY_VAULT_URI / KEY_VAULT_NAME"
-    )
+        _announce_admin_state(env_admin, "env" if env_admin else "fakes: no ADMIN_TOKEN set")
+        return SecretProvider(asmdb_bearer=env_bearer, admin_token=env_admin)
+
+    bearer = env_bearer
+    if bearer is None:
+        vault_url = settings.key_vault_url
+        if vault_url is None:
+            raise SecretError(
+                "asmDB bearer unavailable: set ASMDB_BEARER_TOKEN, or "
+                "KEY_VAULT_URI / KEY_VAULT_NAME"
+            )
+        bearer = await _read_bearer_from_key_vault(vault_url, settings.asmdb_secret_name)
+    else:
+        _log.info("bearer_from_env")
+
+    admin_token, admin_reason = await _resolve_admin_token(settings, env_admin)
+    _announce_admin_state(admin_token, admin_reason)
+
+    return SecretProvider(asmdb_bearer=bearer, admin_token=admin_token)

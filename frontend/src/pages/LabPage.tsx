@@ -8,6 +8,7 @@
  */
 import type { ReactElement } from 'react';
 import {
+  AnimatedTitle,
   Chip,
   RARITY_ORDER,
   RarityBadge,
@@ -16,7 +17,6 @@ import {
   TypePill,
   tokens,
 } from '@/design';
-import { HeroTitle } from '@/components/HeroTitle';
 
 const TOTAL_BLOOMS = 3_650;
 
@@ -36,7 +36,7 @@ export function LabPage(): ReactElement {
   return (
     <div className="flex flex-col gap-12">
       <section className="ps-hero">
-        <HeroTitle text="PUNI LAB" eyebrow="FIELD NOTES" subtitle="HOW A SLIME IS BORN" />
+        <AnimatedTitle text="PUNI LAB" eyebrow="FIELD NOTES" subtitle="HOW A SLIME IS BORN" />
         <p className="mx-auto mt-6 max-w-2xl font-round text-ink">
           Every day, one slime blooms in the PUNIPUNI PARADISE. Each is a tiny, self-contained
           creature — a rarity, a mood, four stats and a story — squished down to a handful of bytes
@@ -72,7 +72,7 @@ export function LabPage(): ReactElement {
 
       <section aria-labelledby="types-heading">
         <h2 id="types-heading" className="mb-5 text-center font-pixel text-[16px] text-ink">
-          SIXTEEN MOODS
+          SIXTEEN TYPES
         </h2>
         <ul className="flex flex-wrap justify-center gap-3">
           {SLIME_TYPES.map((t) => (

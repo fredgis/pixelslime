@@ -88,22 +88,25 @@ const RARITY_RANK: Record<Rarity, number> = {
   MYTHIC: 0, LEGENDARY: 1, EPIC: 2, RARE: 3, UNCOMMON: 4, COMMON: 5,
 };
 
+/** Contract: every sort is tie-broken by `serial` descending, keeping pagination stable. */
+const bySerialDesc = (a: CardSummary, b: CardSummary): number => b.serial - a.serial;
+
 function sortSummaries(items: readonly CardSummary[], sort: CardsSort): CardSummary[] {
   const copy = [...items];
   switch (sort) {
     case 'oldest':
-      return copy.sort((a, b) => a.serial - b.serial);
+      return copy.sort((a, b) => a.mintDate.localeCompare(b.mintDate) || bySerialDesc(a, b));
     case 'rarest':
-      return copy.sort((a, b) => RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity] || b.serial - a.serial);
+      return copy.sort((a, b) => RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity] || bySerialDesc(a, b));
     case 'happiest':
       return copy.sort(
         (a, b) =>
           (CARDS_BY_SERIAL.get(b.serial)?.happiness ?? 0) -
-            (CARDS_BY_SERIAL.get(a.serial)?.happiness ?? 0) || b.serial - a.serial,
+            (CARDS_BY_SERIAL.get(a.serial)?.happiness ?? 0) || bySerialDesc(a, b),
       );
     case 'newest':
     default:
-      return copy.sort((a, b) => b.serial - a.serial);
+      return copy.sort((a, b) => b.mintDate.localeCompare(a.mintDate) || bySerialDesc(a, b));
   }
 }
 
@@ -125,7 +128,7 @@ export const handlers = [
       card,
       nextBloomAt: next.toISOString(),
       secondsUntilNext: Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000)),
-      dayNumber: TODAY_SERIAL,
+      dayNumber: card.dayNumber ?? TODAY_SERIAL,
     });
   }),
 
@@ -214,6 +217,7 @@ export const handlers = [
         { trait_type: 'Rarity', value: card.rarity },
         { trait_type: 'House', value: card.rarityHouse },
         { trait_type: 'Type', value: card.type },
+        { trait_type: 'Mood', value: card.mood ?? 'Unknown' },
         { trait_type: 'Level', value: card.level, display_type: 'number' },
         { trait_type: 'Strength', value: card.strength, display_type: 'number' },
         { trait_type: 'Endurance', value: card.endurance, display_type: 'number' },

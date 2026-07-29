@@ -9,6 +9,7 @@
 import type { ReactElement } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AnimatedTitle,
   Chip,
   RARITY_ORDER,
   RarityBadge,
@@ -17,7 +18,6 @@ import {
 } from '@/design';
 import { useCards, useStats } from '@/api/client';
 import { formatMintDate } from '@/lib/cards';
-import { HeroTitle } from '@/components/HeroTitle';
 import { LoadingState } from '@/components/States';
 
 const GENESIS_TOTAL = 365_000;
@@ -42,7 +42,7 @@ export function BankPage(): ReactElement {
   return (
     <div className="flex flex-col gap-12">
       <section className="ps-hero">
-        <HeroTitle text="SMILE BANK" eyebrow="THE $SMILE ECONOMY" subtitle="THE GENESIS RAIN" />
+        <AnimatedTitle text="SMILE BANK" eyebrow="THE $SMILE ECONOMY" subtitle="THE GENESIS RAIN" />
       </section>
 
       <section

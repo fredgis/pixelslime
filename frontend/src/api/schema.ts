@@ -74,11 +74,12 @@ export interface paths {
                             card: components["schemas"]["Card"];
                             /**
                              * Format: date-time
-                             * @description Next 10:00 Europe/Paris
+                             * @description **Authoritative.** Next 10:00 Europe/Paris, expressed in UTC. Clients should count down to this instant rather than trusting `secondsUntilNext`, which is only a convenience snapshot taken when the response was built and drifts as the response travels.
                              */
                             nextBloomAt: string;
+                            /** @description Convenience only, derived from `nextBloomAt` at response time. Not authoritative. */
                             secondsUntilNext: number;
-                            /** @description How many slimes have bloomed so far */
+                            /** @description Bloom ordinal of the card in this response, i.e. how many slimes have bloomed up to and including it. Always equal to `card.dayNumber`. */
                             dayNumber: number;
                         };
                     };
@@ -117,6 +118,7 @@ export interface paths {
                     size?: number;
                     type?: components["schemas"]["SlimeType"];
                     rarity?: components["schemas"]["Rarity"];
+                    /** @description Sort order. **Every sort is tie-broken by `serial` descending**, so pagination is stable and two implementations of this contract cannot page the same data in different orders. `newest`/`oldest` sort by mint date, `rarest` by rarity ordinal, `happiest` by the happiness stat. */
                     sort?: "newest" | "oldest" | "rarest" | "happiest";
                     /** @description Case-insensitive name search */
                     q?: string;
@@ -567,15 +569,23 @@ export interface components {
             power_name: string;
             power_desc: string;
             quote: string;
-            biome?: string;
-            companion?: string;
             /** Format: date */
             mintDate: string;
+            /** @description This card's 1-based bloom ordinal - the nth slime ever to bloom. Distinct from `serial` only if a serial is ever skipped. */
             dayNumber?: number;
             imageUrl: string;
             thumbUrl: string;
+            /** @description Display name resolved from `biome_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.** */
+            biome?: string | null;
+            /** @description Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.** */
+            mood?: string | null;
+            /** @description Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.** */
+            companion?: string | null;
+            /** @description Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present. */
+            onChain?: boolean;
             /** @description Dominant colours of the artwork, so the UI can tint itself to the card. */
             palette?: string[];
+            /** @description On-chain anchor. **Always present as a key; `null` when the card has not been anchored yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to distinguish absent from null. */
             chain?: {
                 tokenId?: number;
                 txHash?: string;

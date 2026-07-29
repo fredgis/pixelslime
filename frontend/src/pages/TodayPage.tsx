@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  AnimatedTitle,
   CardFlip,
   Confetti,
   Countdown,
@@ -30,7 +31,6 @@ import { useCards, useToday } from '@/api/client';
 import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
 import { useAmbientStore } from '@/store/ambient';
 import { useDiscoveryStore } from '@/store/discovery';
-import { HeroTitle } from '@/components/HeroTitle';
 import { SmartImage } from '@/components/SmartImage';
 import { ErrorState, LoadingState } from '@/components/States';
 
@@ -95,7 +95,7 @@ export function TodayPage(): ReactElement {
       <Confetti ref={confettiRef} />
 
       <section className="ps-hero w-full">
-        <HeroTitle
+        <AnimatedTitle
           text="PIXELSLIME"
           eyebrow="PUNIPUNI PARADISE"
           subtitle="TODAY’S BLOOM HAS ARRIVED"
