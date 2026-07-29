@@ -55,6 +55,40 @@ async def test_scheduled_entrypoint_guards_before_production_wiring() -> None:
     assert result.status == "stood_down"
 
 
+async def test_force_actually_reaches_the_generation_guard() -> None:
+    # PIXELSLIME_FORCE existed to let a run happen outside the 10:00 Paris window —
+    # for seeding a fresh deployment or recovering a missed day. It was applied only
+    # at the outer entrypoint, while run_daily kept its own independent hour check,
+    # so a forced run logged "guard bypassed" and then stood down anyway. The flag
+    # was inert, and the only way to notice was to read both log lines together.
+    env = fake_environment()
+
+    result = await run_daily(
+        env.deps,
+        now_utc=datetime(2026, 7, 29, 18, tzinfo=UTC),  # 20:00 in Paris
+        force=True,
+    )
+
+    assert result.status != "stood_down"
+    assert env.events[0] == "asmdb.warm"
+
+
+async def test_force_does_not_defeat_the_one_card_per_day_rule() -> None:
+    # Forcing bypasses the *clock*, never the date. Two cards for one day would break
+    # the serial-to-day correspondence the whole collection rests on.
+    env = fake_environment()
+    mint_date = date(2026, 7, 29)
+    env.asmdb.seed(build_card(9, mint_day_for_date(mint_date)))
+
+    result = await run_daily(
+        env.deps,
+        now_utc=datetime(2026, 7, 29, 18, tzinfo=UTC),
+        force=True,
+    )
+
+    assert result.status == "already_exists"
+
+
 async def test_existing_mint_date_exits_before_serial_or_generation() -> None:
     env = fake_environment()
     mint_date = date(2026, 7, 29)

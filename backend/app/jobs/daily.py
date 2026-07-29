@@ -41,15 +41,22 @@ async def run_daily(
     deps: JobDependencies,
     *,
     now_utc: datetime | None = None,
+    force: bool = False,
 ) -> DailyResult:
     """Publish only at the Paris 10:00 wall-clock boundary.
 
     The UTC cron deliberately fires twice; this guard makes one run inert, while
     the date lookup makes every retry or redeploy safe.
+
+    ``force`` lifts the *clock* guard only, for seeding a fresh deployment or
+    recovering a missed day. It is passed in rather than read from the environment
+    here so this function stays a pure function of its arguments. It never lifts the
+    date check below: two cards for one day would break the correspondence between a
+    serial and the day it bloomed, which the whole collection rests on.
     """
     now_paris = datetime.now(_PARIS) if now_utc is None else now_utc.astimezone(_PARIS)
     mint_date = now_paris.date()
-    if now_paris.hour != 10:
+    if now_paris.hour != 10 and not force:
         _log.info("not 10:00 in Paris yet, standing down")
         deps.metrics.record(
             "pixelslime.job.stood_down",
@@ -222,7 +229,7 @@ async def run_scheduled(*, now_utc: datetime | None = None) -> DailyResult:
     from .runtime import production_dependencies
 
     async with production_dependencies() as deps:
-        return await run_daily(deps, now_utc=now_paris)
+        return await run_daily(deps, now_utc=now_paris, force=forced)
 
 
 def main() -> None:
