@@ -45,6 +45,61 @@ const EPIC_INDEX = RARITY_ORDER.indexOf('EPIC');
  * happening. Presenting this as an error would be both wrong and a poor first
  * impression, since it is the state every visitor sees for fourteen hours a day.
  */
+/**
+ * The slime discovered before the one still forming.
+ *
+ * The waiting page is what a visitor sees for fourteen hours a day, and a lone
+ * question mark gives them nothing to look at and no reason to stay. Showing the
+ * previous slime turns the wait into a hand-off: here is what yesterday produced,
+ * and something just like it is on its way.
+ */
+function PreviousSlime(): ReactElement | null {
+  const navigate = useNavigate();
+  const recent = useCards({ sort: 'newest', size: 1 });
+  const card = recent.data?.items?.[0];
+
+  if (!card) return null;
+
+  return (
+    <aside
+      aria-labelledby="previous-heading"
+      className="w-full max-w-[260px] rounded-xl border-4 border-ink p-4 shadow-card"
+      style={{ background: tokens.color.cream }}
+    >
+      <h2
+        id="previous-heading"
+        className="text-center font-pixel text-[10px] tracking-[1px] text-ink"
+      >
+        ✦ LAST DISCOVERED ✦
+      </h2>
+
+      <button
+        type="button"
+        onClick={() => navigate(`/slime/${card.serial}`)}
+        className="ps-focusable mt-3 block w-full rounded-lg border-4 border-ink"
+        style={{ background: tokens.color.paper, overflow: 'hidden' }}
+        aria-label={`See ${card.name}, the previous slime`}
+      >
+        <SmartImage
+          src={card.thumbUrl}
+          thumb={card.thumbUrl}
+          alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
+          sizes="240px"
+        />
+      </button>
+
+      <p className="mt-3 text-center font-pixel text-[13px] text-ink">{card.name}</p>
+      <p className="mt-1 text-center font-stat text-[11px] tracking-[1px] text-ink-soft">
+        {card.cardId} · {formatMintDate(card.mintDate)}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+        <RarityBadge rarity={card.rarity} />
+        <TypePill type={card.type} />
+      </div>
+    </aside>
+  );
+}
+
 function PreBloom(): ReactElement {
   const navigate = useNavigate();
   return (
@@ -55,9 +110,15 @@ function PreBloom(): ReactElement {
 
       <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
 
-      <div
-        role="img"
-        aria-label="Today's slime has not bloomed yet"
+      <div className="flex w-full flex-col items-center justify-center gap-8 lg:flex-row lg:items-start">
+        <div className="order-2 flex justify-center lg:order-1 lg:pt-10">
+          <PreviousSlime />
+        </div>
+
+        <div className="order-1 flex flex-col items-center gap-8 lg:order-2">
+          <div
+            role="img"
+            aria-label="Today's slime has not bloomed yet"
         style={{
           position: 'relative',
           width: 'min(360px, 80vw)',
@@ -106,9 +167,11 @@ function PreBloom(): ReactElement {
         >
           STILL CONDENSING
         </span>
-      </div>
+          </div>
 
-      <Countdown label="NEXT SLIME IN" />
+          <Countdown label="NEXT SLIME IN" />
+        </div>
+      </div>
 
       <p
         className="max-w-xl text-center"

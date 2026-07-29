@@ -55,6 +55,36 @@ that already has one.
 ''')
 param forceJobRun bool = false
 
+@description('''
+JSON-RPC endpoint for the chain. Leave empty to deploy without the chain integration —
+the anchor job is then not created at all.
+
+Note the endpoint must permit eth_getLogs: the anchor job recovers a mint whose asmDB
+row was lost by reading Transfer logs, and polygon-amoy-bor-rpc.publicnode.com answers
+any log query with a bare 403.
+''')
+param chainRpcUrl string = ''
+
+@description('EIP-155 chain id. 80002 is Polygon Amoy.')
+param chainId int = 80002
+
+@description('Deployed PixelSlimeCard address — the anchor target.')
+param cardContractAddress string = ''
+
+@description('Deployed ClaimPool address — burns the Bloom Fee, mints the yield.')
+param claimPoolAddress string = ''
+
+@description('''
+secp256k1 key signing anchor and bloom transactions.
+
+A Container Apps secret rather than Key Vault, because the KeyVault_PublicNetwork_Modify
+policy at management-group scope forces publicNetworkAccess: Disabled and reverts any
+change within seconds. app/chain/signer.py refuses this signer off a testnet, so the
+trade-off cannot silently follow the system to a chain carrying real value.
+''')
+@secure()
+param chainSignerKey string = ''
+
 // Key Vault and Storage names cannot fit the full 13-character uniqueString value.
 var uniqueSuffix = take(uniqueString(resourceGroup().id), 10)
 var identityName = 'id-pixelslime'
@@ -169,6 +199,11 @@ module containerApps 'modules/container-apps.bicep' = {
     asmdbInstance: asmdbInstance
     acaSubnetId: network.outputs.acaSubnetId
     jobCommand: jobCommand
+    chainRpcUrl: chainRpcUrl
+    chainId: chainId
+    cardContractAddress: cardContractAddress
+    claimPoolAddress: claimPoolAddress
+    chainSignerKey: chainSignerKey
     forceJobRun: forceJobRun
     storageAccountName: storageAccountName
     registryName: containerRegistryName

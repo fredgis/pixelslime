@@ -2,163 +2,278 @@
 
 <img src="docs/assets/banner.png" alt="PIXELSLIME — PuniPuni Paradise" width="820">
 
-### ✦ ぷにぷに ✦ &nbsp;**One slime per dawn.**
+# ✦ PIXELSLIME ✦
 
-*A rainbow crashed above the clouds, and it rained pixels.*<br>
-*Wherever a pixel landed on something happy, the thing went soft, wobbled twice,*<br>
-*and opened two shiny eyes.*
+### ぷにぷに &nbsp;·&nbsp; **One AI slime per dawn — a whole trading card in 175 bytes, fingerprinted on-chain.**
+
+*A rainbow crashed above the clouds, and it rained pixels. Wherever a pixel landed on*<br>
+*something happy, the thing went soft, wobbled twice, and opened two shiny eyes.*
 
 <br>
 
-[![Status](https://img.shields.io/badge/status-BUILT-7FE3C0?style=for-the-badge)](docs/RUNBOOK.md)
-[![Plan](https://img.shields.io/badge/read-the%20plan-FF8FC5?style=for-the-badge)](docs/PLAN.md)
-[![Runbook](https://img.shields.io/badge/deploy-the%20runbook-8B6FE8?style=for-the-badge)](docs/RUNBOOK.md)
-[![Tests](https://img.shields.io/badge/tests-694%20backend%20%C2%B7%20113%20chain-FFD86B?style=for-the-badge)](#-verified-not-asserted)
+[![Live](https://img.shields.io/badge/live-www.pixelslime.cloud-7FE3C0?style=for-the-badge)](https://www.pixelslime.cloud)
+[![CI](https://img.shields.io/github/actions/workflow/status/fredgis/pixelslime/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/fredgis/pixelslime/actions/workflows/ci.yml)
+[![Chain](https://img.shields.io/badge/chain-Polygon%20Amoy%20·%2080002-8B6FE8?style=for-the-badge)](https://amoy.polygonscan.com/)
+[![Tests](https://img.shields.io/badge/tests-726%20backend%20·%2049%20chain-FFD86B?style=for-the-badge)](#-verified-not-asserted)
 
 </div>
 
 ---
 
-**PIXELSLIME** generates **one unique AI collectible card every day at 10:00 Europe/Paris**, catalogues it
-in a public gallery, packs it into **175 bytes** inside an [asmDB Cloud](https://www.asmdb.cloud)
-database, and anchors it on-chain with the **$SMILE** token.
+## 🫧 What it is
 
-> [!TIP]
-> **So you want to keep a slime.**
->
-> Slimes don't eat — they absorb **moods**. One that naps in a sunbeam turns warm and golden. One raised
-> in a library grows clever and quiet. One that meets a cat learns to purr. That's why no two are ever
-> the same: a slime is a place, a feeling and a friend, squished together.
->
-> Every dawn, exactly **one** condenses out of the Pixel Rain — and a **Slime Keeper** has until the next
-> dawn to catalogue it before it drifts away. Rare ones arrive wrapped in colours that shouldn't exist.
-> The rarest, the **Dreamdrop**, shows up about eighteen times a decade; they say those are dreams that
-> got lost on the way to someone.
->
-> That's the whole job. You're a Keeper now. 🫧
-
-<br>
-
-## 🌸 Today's Bloom
-
-The card of the day arrives face down. Click it, and it flips.
+**PIXELSLIME** invents exactly **one** AI-illustrated collectible creature card every day at **10:00 Europe/Paris**,
+stores the *entire* card inside a single **175-byte** row of an external [asmDB Cloud](https://www.asmdb.cloud)
+database, and anchors a `keccak256` fingerprint of it on the **Polygon Amoy** blockchain. The site is fully
+public — no account, no cookie, no tracking — and it runs itself: a cron job wakes, rolls a rarity, writes the
+card, paints it, verifies it, stores it, anchors it, and goes back to sleep. It is live at
+**[www.pixelslime.cloud](https://www.pixelslime.cloud)**.
 
 <div align="center">
-  <img src="docs/assets/home.png" alt="Today's Bloom — the daily card reveal" width="920">
+  <img src="docs/assets/home.png" alt="Today's Bloom — the daily card reveal" width="900">
 </div>
 
-<br>
+---
 
-## ◈ Slime Profile
-
-Every card exposes its own **provenance**: the exact packed bytes as they live in the database.
-
-<div align="center">
-  <img src="docs/assets/profile.png" alt="Slime Profile — stats, lore and the 175 packed bytes" width="760">
-</div>
-
-<br>
-
-## 🫧 What makes this interesting
+## ✨ Three things that make it interesting
 
 | | |
 |---|---|
-| **175 bytes** | An asmDB row gives you `175` bytes of UTF-8 for content — no NUL, no CR, no LF. A whole trading card has to fit in that. It becomes the **PSC-1 codec**: a 32-byte header plus dictionary-DEFLATE text, Z85-encoded, chunked across rows. |
-| **The constraint is the feature** | Those same packed bytes are what gets hashed with keccak256 on-chain. The chain proves a slime existed exactly like that, on that day — **without duplicating a single byte of it**. |
-| **No keys anywhere** | API key auth is disabled on the model endpoint, so the backend authenticates with a **managed identity**. The database bearer lives in Key Vault. Nothing reaches the browser. |
-| **No login, no personal data** | The site is fully public. Which slimes you've discovered lives in your own `localStorage` — nothing about a visitor is ever sent to the server. |
-| **It runs itself** | A cron job wakes at 10:00 Paris, rolls a rarity, writes the card, paints it, verifies it, stores it, and goes back to sleep. |
+| 🗜️ **A trading card in 65 characters** | An asmDB row gives you **175 bytes** of UTF-8 — no NUL, no CR, no LF. A normal JSON card is **~660**. The **PSC-1 codec** (a 32-byte packed header + dictionary-DEFLATE text, Z85-encoded) gets the first card, *Mochibo*, down to **65 bytes** — one row, 110 to spare. |
+| ⛓️ **Provably the same card, twice** | The exact packed bytes are what gets hashed on-chain. The `cardHash` in the database and the one minted on Polygon Amoy are **byte-for-byte identical** — change one letter of a slime's name and the two would no longer match. |
+| 🌧️ **A ten-year clock made of arithmetic** | A finite reserve of **365,000 SMILE** drains by exactly **100 per card**. `365,000 ÷ 100 = 3,650 cards = exactly ten years`, then it stops forever. That deadline is not a policy — it is baked into the contract, and a Foundry test drains it to *exactly zero* at bloom 3,650. |
 
-<br>
+### The daily bloom, end to end
 
-## 📚 Start here
+```mermaid
+flowchart LR
+    CLOCK(["🕙 10:00 Europe/Paris"]) --> AI["🎨 AI invents one slime<br/>name · lore · stats · art"]
+    AI --> CARD["🃏 a collectible card"]
+    CARD --> CODEC["🗜️ PSC-1 codec<br/>~660 chars ➜ 65"]
+    CODEC --> DB[("🗄️ asmDB row<br/>175-byte hard limit")]
+    CODEC --> HASH["🔑 keccak256 fingerprint"]
+    HASH --> CHAIN["⛓️ anchored on Polygon Amoy"]
+    DB -. "same bytes ⇒ same hash" .-> HASH
+    DB --> WEB(["🌐 www.pixelslime.cloud"])
+    CHAIN --> WEB
 
-| Document | What it is |
-|---|---|
-| **[`docs/PLAN.md`](docs/PLAN.md)** | The complete plan — verified API facts, Azure architecture, the 175-byte codec, the AI pipeline, the $SMILE economy, and an 11-workstream split designed for parallel agents |
-| **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** | **Deploying and operating it** — the remaining rollout steps, plus backfill, token rotation and troubleshooting |
-| **[`docs/CODEC.md`](docs/CODEC.md)** | The normative PSC-1 specification |
-| **[`docs/AGENTS.md`](docs/AGENTS.md)** | Workstream ownership, definition of done, and the gotchas that will bite you |
-| **[`docs/mockup/index.html`](docs/mockup/index.html)** | The original clickable mockup. Open it in a browser |
-
-<br>
-
-## 🗂 What's in the repo
-
-```
-docs/            PLAN.md, RUNBOOK.md, CODEC.md, AGENTS.md, the mockup
-contracts/       card schema, openapi.yaml, PSC-1 fixtures, design tokens, lookups
-infra/           Bicep — identity, Key Vault, Storage, ACR, Container Apps, RBAC
-backend/app/     codec · asmdb · ai · api · core · storage · jobs · chain
-frontend/src/    design system + the five screens
-chain/           Foundry — SmileToken, PixelSlimeCard, ClaimPool, SlimeAdoption
-tests/e2e/       real frontend against real backend
-scripts/         template cleanup, dictionary build, contract validation
-Dockerfile       one image, two entrypoints: the API and the daily job
+    classDef c fill:#FFD86B,stroke:#2B1B4A,stroke-width:2px,color:#2B1B4A
+    classDef a fill:#FF8FC5,stroke:#2B1B4A,stroke-width:2px,color:#2B1B4A
+    classDef d fill:#8FD3FF,stroke:#2B1B4A,stroke-width:2px,color:#2B1B4A
+    classDef w fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    class CLOCK c
+    class AI,CARD,CODEC a
+    class DB,HASH,CHAIN d
+    class WEB w
 ```
 
-<br>
+Every card exposes its own **provenance**: the literal Z85 bytes exactly as they sit in the database.
 
-## 🔬 Verified, not asserted
+<div align="center">
+  <img src="docs/assets/profile.png" alt="Slime Profile — stats, lore and the 175 packed bytes" width="740">
+</div>
 
-| | |
-|---|---|
-| Backend | **694 tests**, `mypy --strict` clean across 66 modules |
-| Chain | **46 Solidity + 67 Python** tests; 3,650 blooms drain the Genesis Rain to exactly zero |
-| Frontend | **0 axe violations** on all five screens, ~80 KB gzipped initial load |
-| Integration | Real frontend against real backend; every response validated against the contract |
-| Codec | A whole Mochibo card fits in **65 of the 175 available bytes**, in a single row |
+---
 
-```bash
-python scripts/validate_contracts.py   # contracts are internally consistent
-python scripts/verify_rows.py          # every emitted row is legal for asmDB
-cd backend && pytest tests             # 694 passed
-cd chain   && forge test               # 46 passed
+## 🪙 SLIME and SMILE are two different tokens
+
+They are one letter apart and it trips everyone up. They are **not** versions of each other — they are
+different standards doing different jobs.
+
+| | 🃏 **SLIME** — the card | 🪙 **SMILE** — the money |
+|---|---|---|
+| Standard | **ERC-721** (non-fungible) | **ERC-20** (fungible) |
+| Divisible? | ❌ no — one token per slime | ✅ yes, 18 decimals |
+| Supply | grows by 1 per anchored card · **3,650 max** | **365,660** today · each bloom shifts it by `yield − 100` |
+| Burned? | never | **100 per bloom**, and minted as yield |
+| Read it as | *the card you hold* | *the coin you spend* |
+
+> Every bloom **burns 100 SMILE** from the finite reserve and **mints `happiness × rarity`** into a
+> separate reward pool. The purse that pays the fee can never print more of it — verified on the live chain,
+> not just asserted in the code.
+
+```mermaid
+flowchart TB
+    RES["🌧️ Genesis Rain<br/>365,000 SMILE · minted once · never refilled"]
+    BLOOM(["🫧 one slime blooms"])
+    BURN["🔥 burn 100 SMILE<br/>gone forever"]
+    MINT["✨ mint happiness × rarity"]
+    POOL["💧 Reward Pool<br/>only ever grows"]
+    ZERO["🛑 at 3,650 cards the Rain hits zero<br/>= exactly ten years, then it stops"]
+
+    BLOOM --> BURN
+    RES -->|drains 100| BURN
+    BLOOM --> MINT --> POOL
+    RES -. "365,000 ÷ 100" .-> ZERO
+
+    classDef res fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef blm fill:#FF8FC5,stroke:#2B1B4A,stroke-width:2px,color:#2B1B4A
+    classDef fire fill:#FF7A59,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef pool fill:#8FD3FF,stroke:#2B1B4A,stroke-width:2px,color:#2B1B4A
+    classDef stop fill:#2B1B4A,stroke:#2B1B4A,stroke-width:2px,color:#FFFFFF
+    class RES res
+    class BLOOM,MINT blm
+    class BURN fire
+    class POOL pool
+    class ZERO stop
+```
+
+---
+
+## 🚀 Quick start — run it locally
+
+No Azure, no asmDB, no wallet. The backend boots against an **in-memory fake** seeded from
+`contracts/cards/*.json`, and the frontend ships a **Mock Service Worker** that answers the whole API.
+
+```powershell
+# 1 · the API, against in-memory fakes (offline)          → http://127.0.0.1:8000
+cd backend
+pip install -e ".[dev]"
+$env:LOCAL_DEV = "1"
+python -m uvicorn app.main:app --reload
+
+# 2 · the SPA, against its built-in mock (no API needed)  → http://127.0.0.1:5173
+cd frontend
+npm install
+npm run dev
+```
+
+The health probe should answer immediately:
+
+```console
+$ curl http://127.0.0.1:8000/api/health
+{"status":"ok","cards":3,"engine":"asmdb-fake/1.0"}
 ```
 
 <details>
-<summary><b>Why the template needed cleaning</b></summary>
+<summary><b>🐳 Or run the real container image</b></summary>
 
 <br>
 
-`mochibo-original.png` looks like it has a transparent background. It does not — it is `RGB` with **no
-alpha channel at all**, and the "transparency" is an 8-pixel checkerboard painted into the pixels.
+The Dockerfile is **one image with two entrypoints** — the API and the daily job — so there is a single
+origin and therefore no CORS problem with asmDB. CI builds this exact image on every push.
 
-Handing that to an image model as a style reference is asking it to **paint a checkerboard**. So the
-pattern is flood-filled from the borders and converted into a real alpha channel:
-
-```bash
-python scripts/clean_template.py \
-  assets/template/mochibo-original.png \
-  assets/template/mochibo.png
+```powershell
+docker build -t pixelslime .
+docker run --rm -p 8000:8000 -e LOCAL_DEV=1 pixelslime   # → http://127.0.0.1:8000
 ```
 
-```
-transparent : 279,475 / 1,572,864 px  (17.8%)
-corner alpha: [0, 0, 0, 0]   centre alpha: 255
-```
-
-Requires `pillow`, `numpy` and `scipy`.
+Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)**.
 
 </details>
 
-<br>
+---
+
+## 🗂 Repository map
+
+| Directory | What lives there |
+|---|---|
+| **`backend/`** | FastAPI app + tests — `codec` · `asmdb` · `ai` · `api` · `core` · `storage` · `jobs` · `chain` |
+| **`frontend/`** | Vite + React 18 + TypeScript SPA — a kawaii design system and the five screens |
+| **`chain/`** | Foundry project — the four Solidity contracts, tests, and the Amoy deploy script |
+| **`contracts/`** | The binding truth: `card.schema.json`, `openapi.yaml`, design tokens, lookups, card fixtures |
+| **`infra/`** | Bicep — identity, Key Vault, Storage, ACR, Container Apps, VNet, RBAC |
+| **`assets/`** | The pinned DEFLATE dictionary (`psdict_v1.bin`) and the Mochibo style template |
+| **`scripts/`** | Contract validation, row verification, dictionary build, template cleanup |
+| **`docs/`** | Architecture, data path, plain-language, codec spec, plan, runbook, agents + the mockup |
+| **`Dockerfile`** | One image, two entrypoints: the API and the daily job |
+
+---
+
+## 📚 Documentation index
+
+| Document | Who it's for |
+|---|---|
+| **[`docs/EASYLEARN.md`](docs/EASYLEARN.md)** | Newcomers — the whole thing in plain language, no jargon |
+| **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** | Operators & engineers — what is *actually* deployed on Azure and Amoy, with drift called out |
+| **[`docs/HOWITWORKS.md`](docs/HOWITWORKS.md)** | Engineers — the byte-for-byte data path through asmDB and the chain |
+| **[`docs/CODEC.md`](docs/CODEC.md)** | Codec implementers — the normative PSC-1 specification |
+| **[`docs/PLAN.md`](docs/PLAN.md)** | Anyone who wants the full reasoning — product, architecture, economy, the agent split |
+| **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** | Whoever ships it — rollout, backfill, token rotation, troubleshooting |
+| **[`docs/AGENTS.md`](docs/AGENTS.md)** | Contributors — how work is split across parallel workstreams |
+
+---
+
+## 🌍 Live deployment
+
+| | |
+|---|---|
+| **Site** | **[www.pixelslime.cloud](https://www.pixelslime.cloud)** · HTTPS with a managed certificate |
+| **Health** | `/api/health` → `{"status":"ok","cards":1,"engine":"1.7.0"}` |
+| **Host** | Azure Container Apps · resource group `FGI-ASMDBPIXELSMILES` · `swedencentral` |
+| **Database** | asmDB Cloud · `smilesdb` · 175-byte rows, the source of truth |
+| **Chain** | Polygon **Amoy** testnet · chain id **80002** · explorer [`amoy.polygonscan.com`](https://amoy.polygonscan.com/) |
+| **Apex** | `pixelslime.cloud` (no `www`) is **not yet bound** — only `www.` serves valid HTTPS |
+
+### Contracts on Polygon Amoy
+
+| Contract | Address | Role |
+|---|---|---|
+| `SmileToken` · ERC-20 **SMILE** | [`0x0BBaC39B…4B39b798`](https://amoy.polygonscan.com/token/0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798) | the currency |
+| `PixelSlimeCard` · ERC-721 **SLIME** | [`0xD88928B5…432Baf7f`](https://amoy.polygonscan.com/token/0xD88928B55CefcAe756e55824a48342cA432Baf7f) | the cards |
+| `ClaimPool` | [`0xbce1362c…B155160d`](https://amoy.polygonscan.com/address/0xbce1362c1155777df19F9cea6c8ECa68B155160d) | burns the fee, mints the yield |
+| `SlimeAdoption` | [`0x20d6A4F3…497473CcA`](https://amoy.polygonscan.com/address/0x20d6A4F365d00b4d27726f13093Dc2C497473CcA) | spend SMILE to adopt |
+
+### PS-0001 · Mochibo, verified end to end
+
+| | |
+|---|---|
+| Card | **Mochibo** · `PS-0001` · `SLIME #1` · EPIC (Aurora) · happiness 95 |
+| Mint tx | [`0x6a1c3c6e…bce6260e`](https://amoy.polygonscan.com/tx/0x6a1c3c6e5879851568bcf934b273aa5979f26de6cd9c248043dae133bce6260e) |
+| Bloom tx | [`0xa29bcec7…f6276ac7`](https://amoy.polygonscan.com/tx/0xa29bcec720a3d34c5973c07fb3b186345c4343ca25cbe5ce9e202676f6276ac7) — burned **100 SMILE**, minted **760** (95 × EPIC ×8) |
+| `cardHash` | `0xe99e4c83…62e7af0a` — **identical** in asmDB and on-chain |
+
+---
+
+## 🔬 Verified, not asserted
+
+Every number below was produced by running the suite in this repository, not copied from a note.
+
+| Area | Result |
+|---|---|
+| **Backend** | **726 tests** (725 passing · 1 skipped · 0 failing) · `mypy --strict` clean across **69 modules** |
+| **Smart contracts** | `forge test` → **49 passing** across 5 suites; 3,650 blooms drain the Genesis Rain to **exactly zero** |
+| **Frontend** | `tsc --noEmit` clean · production build succeeds (fully code-split; React vendor ~51 KB gzip) |
+| **Contracts & codec** | `validate_contracts.py`: all valid · `verify_rows.py`: every row legal for asmDB · Mochibo = **65 of 175 bytes** |
+
+```powershell
+cd backend  ; pip install -e ".[dev]" ; pytest ; mypy -p app ; ruff check .
+cd chain    ; forge test
+cd frontend ; npm install ; npm run build
+python scripts/validate_contracts.py   # contracts are internally consistent
+python scripts/verify_rows.py           # every emitted row is legal for asmDB
+```
+
+---
 
 ## 🎴 Rarity tiers
 
-| | Tier | House name | Odds |
-|---|---|---|---:|
-| ⬜ | `COMMON` | **Puddle** | 45 % |
-| 🟩 | `UNCOMMON` | **Dewdrop** | 27 % |
-| 🟦 | `RARE` | **Prism** | 17 % |
-| 🟪 | `EPIC` | **Aurora** | 8 % |
-| 🟨 | `LEGENDARY` | **Starlight** | 2.5 % |
-| 🟥 | `MYTHIC` | **Dreamdrop** | 0.5 % |
+| | Tier | House | Odds | Yield ×multiplier | Adopt price |
+|---|---|---|---:|---:|---:|
+| ⬜ | `COMMON` | **Puddle** | 45 % | ×1 | 200 |
+| 🟩 | `UNCOMMON` | **Dewdrop** | 27 % | ×2 | 400 |
+| 🟦 | `RARE` | **Prism** | 17 % | ×4 | 900 |
+| 🟪 | `EPIC` | **Aurora** | 8 % | ×8 | 2,000 |
+| 🟨 | `LEGENDARY` | **Starlight** | 2.5 % | ×20 | 6,000 |
+| 🟥 | `MYTHIC` | **Dreamdrop** | 0.5 % | ×100 | 25,000 |
 
-Rolled in code with a seeded weighted random — never left to the model — with a pity timer that forces
-a `RARE` or better if fourteen days pass without one.
+Rarity is rolled in code with a seeded weighted random — never left to the model — with a pity timer that
+forces a `RARE` or better if fourteen days pass without one.
 
-<br>
+---
+
+## 🚧 Honest status
+
+This is a **testnet** build. It works end to end, but it is not finished — here is the unvarnished state.
+
+| | Status |
+|---|---|
+| 🟢 **Live & automated** | Site is up, card generation is on a cron, blockchain anchoring is automated, the economy fires on each bloom |
+| 🟡 **No wallet, no claim yet** | `SMILE` is minted and countable on-chain, but there is **no wallet connection and no claim endpoint** — no human can claim or spend it yet |
+| 🟡 **Adoption not armed** | `SlimeAdoption` is deployed and priced, but the Treasury has **not approved it** to move cards out of the Vault |
+| 🟡 **Key custody** | The chain signing key lives in a **Container Apps secret, not Key Vault** (a governance policy makes the vault's data plane unreachable). The code **refuses to sign on any non-testnet chain** |
+| 🟡 **Apex domain** | `pixelslime.cloud` is not yet bound; only `www.pixelslime.cloud` serves valid HTTPS |
+| ⚪ **Testnet only** | Polygon Amoy · **no real value** |
 
 ---
 

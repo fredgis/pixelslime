@@ -33,7 +33,15 @@ _log = get_logger(__name__)
 #: Row id of the anchor part, mirroring ``serial * 16 + ANCHOR_PART`` (docs/CODEC.md §4.3).
 _ANCHOR_PART = 8
 
-DEFAULT_TOKEN_URI_BASE = "https://pixelslime.cloud/api/cards/"
+#: Where a marketplace should look for a card's ERC-721 metadata.
+#:
+#: This must address ``/api/nft/``, not ``/api/cards/``: the latter returns the site's
+#: own card payload, which is not ERC-721 metadata and which a marketplace cannot read.
+#: The host is ``www`` because that is the name with a certificate. PS-0001 was minted
+#: pointing at ``https://pixelslime.cloud/api/cards/1`` — wrong on both counts — and a
+#: tokenURI cannot be rewritten after the mint, so that one card is permanently
+#: mis-addressed. Everything after it is not.
+DEFAULT_TOKEN_URI_BASE = "https://www.pixelslime.cloud/api/nft/"
 
 
 class CardAnchorer(Protocol):

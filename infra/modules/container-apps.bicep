@@ -77,11 +77,70 @@ param jobCommand string = 'daily'
 @description('Let the daily job run outside its 10:00 Europe/Paris window.')
 param forceJobRun bool = false
 
+@description('JSON-RPC endpoint for the chain. Must permit eth_getLogs for mint recovery.')
+param chainRpcUrl string = ''
+
+@description('EIP-155 chain id. 80002 is Polygon Amoy.')
+param chainId int = 80002
+
+@description('Deployed PixelSlimeCard address — the anchor target.')
+param cardContractAddress string = ''
+
+@description('Deployed ClaimPool address — burns the Bloom Fee and mints the yield.')
+param claimPoolAddress string = ''
+
+@description('''
+secp256k1 key that signs anchor and bloom transactions.
+
+Held here rather than in Key Vault because the KeyVault_PublicNetwork_Modify policy at
+management-group scope forces publicNetworkAccess: Disabled and reverts any change
+within seconds, leaving the vault data plane unreachable. app/chain/signer.py refuses
+this signer on any chain outside TESTNET_CHAIN_IDS, so the concession cannot follow the
+system onto a chain where the money is real.
+''')
+@secure()
+param chainSignerKey string = ''
+
 var asmDbSecretName = 'asmdb-bearer-token'
 var adminSecretName = 'admin-token'
+var chainKeySecretName = 'chain-signer-key'
 var containerImage = deployPlaceholderImage
   ? placeholderImage
   : '${registry.properties.loginServer}/${imageRepositoryName}:${containerImageTag}'
+var chainEnvironmentVariables = empty(chainRpcUrl)
+  ? []
+  : concat(
+      [
+        {
+          name: 'CHAIN_RPC_URL'
+          value: chainRpcUrl
+        }
+        {
+          name: 'CHAIN_ID'
+          value: string(chainId)
+        }
+        {
+          name: 'CARD_CONTRACT_ADDRESS'
+          value: cardContractAddress
+        }
+        {
+          name: 'CLAIM_POOL_ADDRESS'
+          value: claimPoolAddress
+        }
+      ],
+      empty(chainSignerKey)
+        ? []
+        : [
+            {
+              name: 'CHAIN_ALLOW_LOCAL_SIGNER'
+              value: 'true'
+            }
+            {
+              name: 'CHAIN_LOCAL_PRIVATE_KEY'
+              secretRef: chainKeySecretName
+            }
+          ]
+    )
 var commonEnvironmentVariables = [
   {
     name: 'AZURE_CLIENT_ID'
@@ -131,7 +190,8 @@ var adminEnvironmentVariable = empty(adminToken)
 var runtimeEnvironmentVariables = concat(
   commonEnvironmentVariables,
   bearerEnvironmentVariable,
-  adminEnvironmentVariable
+  adminEnvironmentVariable,
+  chainEnvironmentVariables
 )
 var containerEnvironmentVariables = deployPlaceholderImage
   ? commonEnvironmentVariables
@@ -152,7 +212,15 @@ var adminSecret = empty(adminToken)
         value: adminToken
       }
     ]
-var appSecrets = deployPlaceholderImage ? [] : concat(bearerSecret, adminSecret)
+var chainSecret = empty(chainSignerKey)
+  ? []
+  : [
+      {
+        name: chainKeySecretName
+        value: chainSignerKey
+      }
+    ]
+var appSecrets = deployPlaceholderImage ? [] : concat(bearerSecret, adminSecret, chainSecret)
 var registries = deployPlaceholderImage
   ? []
   : [
@@ -312,6 +380,68 @@ resource dailyJob 'Microsoft.App/jobs@2025-07-01' = {
                 'app.jobs'
               ]
           env: containerEnvironmentVariables
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+        }
+      ]
+    }
+  }
+}
+
+// Anchoring runs as its own job, half an hour behind the bloom. Keeping it separate
+// from generation is deliberate: a card in asmDB is already the real artefact, so an
+// RPC hiccup or an empty gas tank must never roll it back or hold up the day's slime.
+// It is also self-healing — a serial that already carries its anchor row costs one
+// cheap read, so re-running is safe and is the normal way a failure is recovered.
+resource anchorJob 'Microsoft.App/jobs@2025-07-01' = if (!deployPlaceholderImage && !empty(chainRpcUrl)) {
+  name: '${jobName}-anchor'
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
+  }
+  properties: {
+    environmentId: environment.id
+    configuration: {
+      triggerType: 'Schedule'
+      replicaTimeout: 1800
+      replicaRetryLimit: 1
+      scheduleTriggerConfig: {
+        cronExpression: '30 8,9 * * *'
+        parallelism: 1
+        replicaCompletionCount: 1
+      }
+      registries: registries
+      secrets: appSecrets
+    }
+    template: {
+      containers: [
+        {
+          name: 'anchor'
+          image: containerImage
+          command: [
+            'python'
+          ]
+          args: [
+            '-m'
+            'app.jobs'
+          ]
+          // Same template as the daily job apart from this one variable, which is what
+          // selects the subcommand. Overriding the command at start time instead would
+          // replace the template and drop every variable below.
+          env: concat(
+            filter(containerEnvironmentVariables, e => e.name != 'PIXELSLIME_JOB'),
+            [
+              {
+                name: 'PIXELSLIME_JOB'
+                value: 'anchor'
+              }
+            ]
+          )
           resources: {
             cpu: json('0.5')
             memory: '1Gi'

@@ -144,6 +144,25 @@ def raw_view(card: Card, *, chain: ChainAnchor | None = None) -> dict[str, Any]:
     }
 
 
+#: Hosts where an http:// base URL is genuinely http and must be left alone.
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "testserver")
+
+
+def _public_base(base_url: str) -> str:
+    """Normalise the request's base URL into one safe to publish in metadata.
+
+    The app terminates TLS at the ingress, so ``request.base_url`` reports ``http``
+    even when the visitor arrived over ``https``. Echoing that back puts insecure URLs
+    inside a document that wallets and marketplaces fetch — mixed content a browser may
+    refuse outright, in a record that is expensive to correct once a token points at
+    it. Local and test hosts are left untouched so development still works.
+    """
+    base = base_url if base_url.endswith("/") else base_url + "/"
+    if base.startswith("http://") and not any(host in base for host in _LOCAL_HOSTS):
+        base = "https://" + base[len("http://") :]
+    return base
+
+
 def nft_metadata(card: Card, *, base_url: str) -> dict[str, Any]:
     """Build the ERC-721 metadata document for a card.
 
@@ -155,7 +174,7 @@ def nft_metadata(card: Card, *, base_url: str) -> dict[str, Any]:
     serial = card.serial
     day = mint_date(card.mint_day)
     minted_at = int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp())
-    base = base_url if base_url.endswith("/") else base_url + "/"
+    base = _public_base(base_url)
 
     attributes: list[dict[str, Any]] = [
         {"trait_type": "Rarity", "value": card.rarity},
