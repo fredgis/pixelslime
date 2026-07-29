@@ -195,6 +195,32 @@ class CardIndex:
             _log.info("pending_anchors_refreshed", refreshed=updated, pending=len(pending))
         return updated
 
+    async def refresh_unanchored(self, source: CardSource, limit: int = 256) -> int:
+        """Sweep cards that carry no anchor yet, ignoring ``flags.on_chain``.
+
+        :meth:`refresh_pending_anchors` bounds its work by trusting that flag, which
+        holds while minting and anchoring belong to one lifecycle. It stops holding
+        the moment a chain is introduced to a collection that already exists: those
+        cards were encoded with the flag clear, and it cannot be corrected afterwards
+        because ``flags`` is part of the hashed stream — flipping the bit would change
+        ``cardHash`` and invalidate the commitment already published on-chain.
+
+        So this sweep asks the evidence instead of the hint. It is meant for startup,
+        where the cost is paid once, and it is capped so that a long unanchored tail
+        can never stall a boot. Returns the number newly anchored on this pass.
+        """
+        unanchored = [
+            serial for serial, entry in self._by_serial.items() if entry.chain is None
+        ][:limit]
+        updated = 0
+        for serial in unanchored:
+            await self.refresh_chain(source, serial)
+            if self.chain_for(serial) is not None:
+                updated += 1
+        if updated:
+            _log.info("unanchored_sweep", refreshed=updated, scanned=len(unanchored))
+        return updated
+
     # ── reads ───────────────────────────────────────────────────────────────
     @property
     def size(self) -> int:
@@ -384,6 +410,10 @@ async def bootstrap_index(
     if source_ok:
         try:
             await index.reconcile(source)
+            # reconcile is add-only, so a card already in the index never has its
+            # anchor re-read. Sweeping here is what makes a retroactive anchor visible
+            # without a full rebuild.
+            await index.refresh_unanchored(source)
             index.degraded = False
             _log.info("index_reconciled", cards=index.size, engine=index.engine)
         except AsmDbError as exc:

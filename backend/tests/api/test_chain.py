@@ -169,3 +169,35 @@ async def test_refresh_pending_anchors_only_polls_flagged_cards() -> None:
 
     assert index.chain_for(1) is not None
     assert index.chain_for(2) is None  # flag clear → never polled, so never a wasted read
+
+
+async def test_startup_sweep_surfaces_anchors_the_flag_never_predicted() -> None:
+    # refresh_pending_anchors deliberately trusts flags.on_chain to bound its work,
+    # which assumes anchoring always follows minting inside one lifecycle. That breaks
+    # the moment a chain is introduced to a collection that already exists: those cards
+    # were encoded with the flag clear, and the flag cannot be flipped afterwards
+    # because it is part of the hashed stream — rewriting it would invalidate the very
+    # cardHash already committed on-chain. The startup sweep is the escape: it costs
+    # one pass over the unanchored cards, and it drains as they are anchored.
+    source = InMemoryCardSource()
+    source.add_card(build_card(1))  # flag clear, anchored retroactively
+    index = CardIndex()
+    await index.reconcile(source)
+    assert index.chain_for(1) is None
+
+    source.add_anchor(anchor_for(1))
+
+    assert await index.refresh_unanchored(source) == 1
+    assert index.chain_for(1) is not None
+
+
+async def test_startup_sweep_is_capped_so_a_large_unanchored_tail_cannot_stall_boot() -> None:
+    source = InMemoryCardSource()
+    for serial in range(1, 6):
+        source.add_card(build_card(serial))
+    index = CardIndex()
+    await index.reconcile(source)
+    for serial in range(1, 6):
+        source.add_anchor(anchor_for(serial))
+
+    assert await index.refresh_unanchored(source, limit=2) == 2

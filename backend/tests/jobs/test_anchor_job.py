@@ -1,0 +1,219 @@
+"""The anchor job: put a card that already exists in asmDB onto the chain.
+
+W9 built the chain layer and W5 built the jobs, but nothing ever called from one to
+the other, so cards were minted into asmDB and never anchored. These tests pin the
+seam that closes that gap.
+
+The chain itself is stubbed. What matters here is the *contract between the job and
+asmDB* — that a successful mint leaves behind a row which decodes back to the same
+transaction, and that a serial already on-chain is not anchored twice.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+import pytest
+
+from _jobs_helpers import FakeAsmDb, build_card
+from app.chain import AnchorReceipt, AnchorResult, decode_anchor_row
+from app.codec import card_hash, encode
+from app.jobs.anchor import AnchorDependencies, anchor_serial
+
+TX_HASH = bytes.fromhex("aa" * 32)
+BLOCK = 7_123_456
+TOKEN_ID = 1
+
+
+class StubAnchorer:
+    """Stands in for a chain. Records calls and returns a scripted receipt."""
+
+    def __init__(
+        self,
+        *,
+        already_minted: bool = False,
+        recovered: AnchorResult | None = None,
+    ) -> None:
+        self.already_minted = already_minted
+        self.recovered = recovered
+        self.calls: list[tuple[int, bytes, str]] = []
+
+    def anchor(self, serial: int, card_hash_: bytes, token_uri: str) -> AnchorReceipt:
+        self.calls.append((serial, card_hash_, token_uri))
+        if self.already_minted:
+            return AnchorReceipt(
+                serial=serial,
+                token_id=serial,
+                card_hash=card_hash_,
+                already_minted=True,
+            )
+        return AnchorReceipt(
+            serial=serial,
+            token_id=TOKEN_ID,
+            card_hash=card_hash_,
+            already_minted=False,
+            tx_hash=TX_HASH,
+            block_number=BLOCK,
+        )
+
+    def find_mint(self, serial: int) -> AnchorResult | None:
+        del serial
+        return self.recovered
+
+
+class FakeRepository:
+    """The slice of the W3 repository the anchor job touches."""
+
+    def __init__(self, db: FakeAsmDb) -> None:
+        self._db = db
+
+    async def read_card_rows(self, serial: int) -> list[object]:
+        prefix = f"psc.{serial}."
+        return [row for row in self._db.rows.values() if str(row.tag).startswith(prefix)]
+
+
+class FakeRowWriter:
+    """Writes one addressed row, the way asmDB's upsert does.
+
+    The anchor row is a standalone part 8, not a member of a contiguous card write,
+    so it deliberately does *not* go through the repository's whole-card writer —
+    that one rejects any set of rows which does not start at part zero.
+    """
+
+    def __init__(self, db: FakeAsmDb) -> None:
+        self._db = db
+        self.written: list[object] = []
+
+    async def upsert(self, row: object) -> object:
+        self._db.rows[row.id] = row  # type: ignore[attr-defined]
+        self.written.append(row)
+        return row
+
+
+def _seeded(serial: int = 1) -> tuple[AnchorDependencies, FakeAsmDb, object]:
+    db = FakeAsmDb(events=[])
+    card = build_card(serial=serial, mint_day=1)
+    db.seed(card)
+    return (
+        AnchorDependencies(
+            repository=FakeRepository(db),
+            writer=FakeRowWriter(db),
+            anchorer=StubAnchorer(),
+        ),
+        db,
+        card,
+    )
+
+
+@pytest.mark.asyncio
+async def test_anchoring_writes_a_row_that_decodes_to_the_transaction() -> None:
+    deps, db, card = _seeded()
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is True
+    # The hash handed to the chain must be the keccak of the canonical stream,
+    # not of anything the job re-derived on its own.
+    assert deps.anchorer.calls[0][1] == card_hash(card)  # type: ignore[attr-defined]
+
+    stored = db.rows[1 * 16 + 8]
+    decoded = decode_anchor_row(stored.content, expected_serial=1)
+    assert decoded.tx_hash == TX_HASH
+    assert decoded.block_number == BLOCK
+    assert decoded.card_hash == card_hash(card)
+    assert decoded.explorer_url is not None
+
+
+@pytest.mark.asyncio
+async def test_a_serial_already_on_chain_is_not_anchored_twice() -> None:
+    deps, db, _ = _seeded()
+    deps = replace(deps, anchorer=StubAnchorer(already_minted=True))
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is False
+    assert (1 * 16 + 8) not in db.rows
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_serial_is_reported_rather_than_anchored() -> None:
+    db = FakeAsmDb(events=[])
+    anchorer = StubAnchorer()
+    deps = AnchorDependencies(
+        repository=FakeRepository(db),
+        writer=FakeRowWriter(db),
+        anchorer=anchorer,
+    )
+
+    with pytest.raises(LookupError):
+        await anchor_serial(99, deps=deps)
+
+    assert anchorer.calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_token_uri_addresses_the_serial() -> None:
+    deps, _, _ = _seeded()
+    deps = replace(deps, token_uri_base="https://pixelslime.cloud/api/cards/")
+
+    await anchor_serial(1, deps=deps)
+
+    assert deps.anchorer.calls[0][2] == "https://pixelslime.cloud/api/cards/1"  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_a_second_run_after_success_does_not_re_anchor() -> None:
+    # The row written by the first run is what makes a re-run cheap: the job must
+    # notice it and return before it ever asks the chain anything.
+    deps, _, _ = _seeded()
+    await anchor_serial(1, deps=deps)
+    calls_after_first = len(deps.anchorer.calls)  # type: ignore[attr-defined]
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is False
+    assert len(deps.anchorer.calls) == calls_after_first  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_a_mint_that_landed_without_its_row_is_recovered() -> None:
+    # The dangerous window: the mint transaction is confirmed on-chain but the
+    # process dies before asmDB is written. The chain then reports "already minted"
+    # forever, so without recovery the card could never be anchored in the database
+    # and the site would show ANCHOR PENDING for a card that is demonstrably on the
+    # chain. The job must heal that by asking the chain for the original mint.
+    deps, db, card = _seeded()
+    recovered = AnchorResult(
+        serial=1,
+        tx_hash=TX_HASH,
+        block_number=BLOCK,
+        token_id=TOKEN_ID,
+        card_hash=card_hash(card),
+    )
+    deps = replace(
+        deps,
+        anchorer=StubAnchorer(already_minted=True, recovered=recovered),
+    )
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is True
+    decoded = decode_anchor_row(db.rows[1 * 16 + 8].content, expected_serial=1)
+    assert decoded.tx_hash == TX_HASH
+    assert decoded.card_hash == card_hash(card)
+
+
+@pytest.mark.asyncio
+async def test_recovery_is_skipped_when_the_chain_cannot_find_the_mint() -> None:
+    deps, db, _ = _seeded()
+    deps = replace(deps, anchorer=StubAnchorer(already_minted=True, recovered=None))
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is False
+    assert (1 * 16 + 8) not in db.rows
+
+
+def test_encode_is_importable() -> None:
+    # Guards against the helper drifting away from the codec surface the job uses.
+    assert callable(encode)

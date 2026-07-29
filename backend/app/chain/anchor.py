@@ -50,6 +50,19 @@ CARD_ABI: list[dict[str, Any]] = [
         "inputs": [{"name": "serial", "type": "uint256"}],
         "outputs": [{"name": "", "type": "bytes32"}],
     },
+    # Needed by find_mint: recovering a mint whose asmDB row was lost means reading
+    # it back out of chain history, and web3 cannot filter logs for an event the ABI
+    # does not describe.
+    {
+        "type": "event",
+        "name": "Transfer",
+        "anonymous": False,
+        "inputs": [
+            {"name": "from", "type": "address", "indexed": True},
+            {"name": "to", "type": "address", "indexed": True},
+            {"name": "tokenId", "type": "uint256", "indexed": True},
+        ],
+    },
 ]
 
 
@@ -178,3 +191,66 @@ class Anchorer:
                 tx_hash=tx_hash,
                 block_number=block_number,
             )
+
+    def find_mint(
+        self,
+        serial: int,
+        *,
+        lookback_blocks: int = 200_000,
+        chunk_size: int = 900,
+    ) -> AnchorResult | None:
+        """Recover the transaction that first minted ``serial``, from chain history.
+
+        A mint cannot be repeated, so when a card is on-chain but its anchor row is
+        missing — the process died between the two writes — the only way to complete
+        the record is to go and read back what already happened. Returns ``None`` when
+        no mint is found within ``lookback_blocks``, which the caller treats as "leave
+        it pending" rather than inventing a commitment.
+
+        The search walks backwards in ``chunk_size`` windows because public RPC
+        providers reject wide ``eth_getLogs`` ranges outright (Amoy's public node
+        answers a 200k-block span with a bare 403). Walking backwards also finds the
+        most recent mints — the ones a retry is most likely to be chasing — first.
+        """
+        if not self.is_minted(serial):
+            return None
+
+        latest = int(self._web3.eth.block_number)
+        floor = max(0, latest - lookback_blocks)
+        high = latest
+        while high >= floor:
+            low = max(floor, high - chunk_size + 1)
+            found = self._find_mint_in_range(serial, low, high)
+            if found is not None:
+                return found
+            if low == floor:
+                break
+            high = low - 1
+
+        _log.warning("anchor_mint_log_not_found", serial=serial, from_block=floor)
+        return None
+
+    def _find_mint_in_range(self, serial: int, low: int, high: int) -> AnchorResult | None:
+        """Scan one block window for the Transfer that created ``serial``."""
+        try:
+            logs = self._contract.events.Transfer().get_logs(
+                from_block=low,
+                to_block=high,
+                argument_filters={"tokenId": serial},
+            )
+        except Exception as exc:  # an RPC may cap the range or reject the filter
+            _log.warning("anchor_find_mint_failed", serial=serial, error=str(exc))
+            return None
+
+        # The mint is the Transfer out of the zero address; later trades share the id.
+        for entry in logs:
+            if int(str(entry["args"]["from"]), 16) != 0:
+                continue
+            return AnchorResult(
+                serial=serial,
+                tx_hash=bytes(entry["transactionHash"]),
+                block_number=int(entry["blockNumber"]),
+                token_id=int(entry["args"]["tokenId"]),
+                card_hash=bytes(self._contract.functions.cardHash(serial).call()),
+            )
+        return None

@@ -17,9 +17,9 @@ import argparse
 import os
 import sys
 
-from . import backfill, daily, seed
+from . import anchor, backfill, daily, seed
 
-_COMMANDS = ("daily", "backfill", "seed")
+_COMMANDS = ("daily", "backfill", "seed", "anchor")
 
 
 def _argv_from_environment() -> list[str]:
@@ -50,6 +50,8 @@ def main(argv: list[str] | None = None) -> None:
         daily.main()
     elif args.command == "backfill":
         backfill.main(remainder)
+    elif args.command == "anchor":
+        anchor.main(remainder)
     else:
         if remainder:
             parser.error("seed takes no arguments")
