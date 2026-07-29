@@ -192,13 +192,17 @@ async def _run(serials: list[int]) -> None:
     secrets = await load_secrets(settings)
     asmdb = AsmDbClient(settings.asmdb_url, secrets.asmdb_bearer_for_client())
     try:
-        deps = AnchorDependencies(
-            repository=AsmDbRepository(asmdb),
-            writer=asmdb,
-            anchorer=anchorer,
-        )
-        for serial in serials:
-            outcome = await anchor_serial(serial, deps=deps)
+        repository = AsmDbRepository(asmdb)
+        deps = AnchorDependencies(repository=repository, writer=asmdb, anchorer=anchorer)
+        targets = serials or await repository.list_card_serials()
+        for serial in targets:
+            try:
+                outcome = await anchor_serial(serial, deps=deps)
+            except Exception as exc:
+                # One bad serial must not abandon the rest: a catch-up run exists
+                # precisely to make progress through a backlog.
+                _log.warning("anchor_failed", serial=serial, error=str(exc))
+                continue
             _log.info(
                 "anchor_outcome",
                 serial=outcome.serial,
@@ -212,8 +216,10 @@ async def _run(serials: list[int]) -> None:
 def main(argv: list[str] | None = None) -> None:
     """``python -m app.jobs anchor [SERIAL ...]`` — anchor one or more serials.
 
-    With no serials the job anchors every serial the database knows about that is
-    not yet on-chain, which is what a scheduled catch-up run wants.
+    With no serials the job walks every serial asmDB knows about. That is the shape a
+    scheduled catch-up wants: :func:`anchor_serial` returns immediately for anything
+    already carrying an anchor row, so a full pass costs one cheap read per anchored
+    card and actually does work only for the ones still pending.
     """
     import argparse
     import asyncio
@@ -222,10 +228,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("serials", nargs="*", type=int, help="Serials to anchor.")
     args = parser.parse_args(argv or [])
 
-    serials = args.serials or _serials_from_environment()
-    if not serials:
-        raise SystemExit("no serials given; pass them as arguments or set ANCHOR_SERIALS")
-    asyncio.run(_run(serials))
+    asyncio.run(_run(args.serials or _serials_from_environment()))
 
 
 def _serials_from_environment() -> list[int]:
