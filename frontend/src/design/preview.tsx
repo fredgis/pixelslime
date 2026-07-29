@@ -37,6 +37,8 @@ const SAMPLES: Sample[] = [
   { serial: 8, name: 'Glimmerpuff', rarity: 'MYTHIC', type: 'DREAM', level: 22, spriteColor: '#FFA8DE', accessory: 'star', face: 'happy' },
   { serial: 10, name: 'Zapkin', rarity: 'UNCOMMON', type: 'STORM', level: 13, spriteColor: '#9B87F0', accessory: 'none', face: 'happy' },
   { serial: 7, name: 'Nibblewisp', rarity: 'EPIC', type: 'GHOST', level: 16, spriteColor: '#B6ADE2', accessory: 'horn', face: 'sleepy', locked: true },
+  // Deliberately broken artwork URL: proves the onError → procedural sprite fallback.
+  { serial: 11, name: 'Patchwork', rarity: 'RARE', type: 'PAPER', level: 9, imageSrc: './preview-assets/missing-404.png', spriteColor: '#E8D9B8', accessory: 'leaf', face: 'smug' },
 ];
 
 const SPRITE_SHOWCASE: Array<{ color: string; accessory: SlimeAccessory; face: SlimeFace }> = [
@@ -90,6 +92,7 @@ export function Preview(): ReactElement {
 
       <div style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 22px 120px' }}>
         {/* ── Top bar ─────────────────────────────────────────────── */}
+        <header>
         <div className="flex items-center gap-3" style={{ marginBottom: 8 }}>
           <SlimeSprite baseColor="#FF9EC4" accessory="flower" size={40} />
           <span className="font-pixel" style={{ fontSize: 13, letterSpacing: 1 }}>
@@ -107,7 +110,9 @@ export function Preview(): ReactElement {
         <p className="text-ink-soft font-bold" style={{ fontSize: 13, marginBottom: 30 }}>
           Every component, every state. Animations honour <code>prefers-reduced-motion</code> (degrade to a fade).
         </p>
+        </header>
 
+        <main>
         {/* ── Animated title ──────────────────────────────────────── */}
         <Section title="ANIMATED TITLE">
           <div style={{ display: 'grid', gap: 28 }}>
@@ -161,7 +166,7 @@ export function Preview(): ReactElement {
         </Section>
 
         {/* ── Slimedex grid ───────────────────────────────────────── */}
-        <Section title="SLIMEDEX" sub={opened ? `Opened ${opened}` : 'Hover to lift & tilt; the holo sheen scales with rarity. One tile is a locked silhouette.'}>
+        <Section title="SLIMEDEX" sub={opened ? `Opened ${opened}` : 'Hover to lift & tilt; the holo sheen scales with rarity. The locked tile hides its tier entirely; the last tile has a dead image URL and falls back to its sprite.'}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(196px,1fr))', gap: 24 }}>
             {SAMPLES.map((c, i) => (
               <SlimeCard
@@ -258,6 +263,8 @@ export function Preview(): ReactElement {
             ))}
           </div>
         </Section>
+
+        </main>
 
         <footer className="font-stat" style={{ fontSize: 13, color: 'var(--ps-ink-soft)', textAlign: 'center', paddingTop: 20 }}>
           PIXELSLIME · PUNIPUNI PARADISE — design system preview · made with 🫧 in the Puniverse

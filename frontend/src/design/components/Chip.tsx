@@ -37,8 +37,19 @@ export function Chip({
     .filter(Boolean)
     .join(' ');
 
+  // A bare <span> maps to the generic role, on which `aria-label` is name-prohibited
+  // (axe: aria-prohibited-attr). When a label is supplied we promote the pill to
+  // role="img" so it is announced as one labelled unit (e.g. "Rarity EPIC, Aurora
+  // house") instead of its decorative glyph being read out character by character.
+  const label = rest['aria-label'];
+
   return (
-    <span className={classes} style={{ ...toned, ...style }} aria-label={rest['aria-label']}>
+    <span
+      className={classes}
+      style={{ ...toned, ...style }}
+      role={label != null ? 'img' : undefined}
+      aria-label={label}
+    >
       {icon != null ? <span aria-hidden="true">{icon}</span> : null}
       {children}
     </span>

@@ -67,7 +67,7 @@ export function Countdown({
 
   const classes = ['ps-countdown', className ?? ''].filter(Boolean).join(' ');
   return (
-    <span className={classes} aria-label={`${String(label)} ${display}`}>
+    <span className={classes} role="timer" aria-label={`${String(label)} ${display}`}>
       {label}
       <b>{display}</b>
     </span>

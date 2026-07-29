@@ -94,6 +94,20 @@
   border-radius: var(--ps-radius-sm);
 }
 
+/* Visually-hidden but announced to assistive tech. Namespaced as `ps-` so it never
+   collides with Tailwind's own `.sr-only` when both stylesheets are present. */
+.ps-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ══════════════════ KEYFRAMES ══════════════════ */
 @keyframes ps-squish { 0%, 100% { transform: scale(1, 1); } 45% { transform: scale(1.14, .86); } 70% { transform: scale(.94, 1.08); } }
 @keyframes ps-letterhop { 0%, 62%, 100% { transform: translateY(0) scale(1, 1); } 70% { transform: translateY(-16px) scale(.9, 1.14); } 82% { transform: translateY(0) scale(1.14, .88); } 90% { transform: translateY(0) scale(1, 1); } }
@@ -217,6 +231,7 @@
 .ps-tile__row { display: flex; justify-content: space-between; align-items: center; font-family: var(--ps-font-stat); font-size: 12px; color: var(--ps-ink-soft); }
 .ps-tile__serial { position: absolute; top: 9px; left: 9px; font-family: var(--ps-font-stat); font-size: 11px; background: rgba(43, 27, 74, .82); color: #fff; padding: 4px 9px; border-radius: 999px; z-index: 2; }
 .ps-tile__rartag { padding: 3px 9px; border-radius: 999px; color: var(--ps-ink); font-weight: 700; font-size: 11px; }
+.ps-tile__locktag { flex: 1; text-align: center; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 11px; letter-spacing: 1px; color: var(--ps-ink-soft); background: color-mix(in srgb, var(--ps-ink-soft) 16%, var(--ps-paper)); }
 .ps-tile.locked .ps-tile__art { background: repeating-linear-gradient(45deg, #3A2C5E 0 12px, #463672 12px 24px); }
 .ps-tile.locked .ps-tile__art svg { filter: brightness(0) opacity(.42); }
 .ps-tile.locked .ps-tile__name { color: var(--ps-ink-soft); }

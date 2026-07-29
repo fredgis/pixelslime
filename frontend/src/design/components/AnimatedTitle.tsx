@@ -6,9 +6,12 @@ import { useTypewriter } from '../hooks/useTypewriter';
 /**
  * <AnimatedTitle/> — the hero lockup: a ぷにぷに eyebrow, the wordmark whose every
  * letter bounces on a stagger with squash-and-stretch, and a subtitle that types
- * itself out. On MYTHIC days pass `rainbow` for the animated foil. The full text is
- * exposed to assistive tech via aria-label while the per-letter spans are hidden, so
- * it reads as one word, not ten. Reduced motion is honoured centrally.
+ * itself out. On MYTHIC days pass `rainbow` for the animated foil. The decorative
+ * per-letter spans and the typewriter copy are `aria-hidden`, and the complete text
+ * is exposed once via a visually-hidden `.ps-sr-only` span, so assistive tech reads
+ * each line as one whole phrase instead of a character-by-character stutter (and we
+ * avoid putting `aria-label` on role-less elements). Reduced motion is honoured
+ * centrally.
  */
 
 export interface AnimatedTitleProps {
@@ -47,7 +50,8 @@ export function AnimatedTitle({
     <div className={rootClasses}>
       {eyebrow != null ? <div className="ps-eyebrow">{eyebrow}</div> : null}
 
-      <Heading className={titleClasses} aria-label={text}>
+      <Heading className={titleClasses}>
+        <span className="ps-sr-only">{text}</span>
         {[...text].map((ch, i) => (
           <span
             key={`${ch}-${i}`}
@@ -63,7 +67,8 @@ export function AnimatedTitle({
       </Heading>
 
       {subtitle != null ? (
-        <div className="ps-subtitle" aria-label={subtitle}>
+        <div className="ps-subtitle">
+          <span className="ps-sr-only">{subtitle}</span>
           <span aria-hidden="true">
             {typed}
             <span className="ps-caret">▌</span>

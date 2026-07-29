@@ -9,6 +9,28 @@ Everything is driven by `tokens.ts` (the single source of every hex, mirrored fr
 
 ---
 
+## ⚠️ REQUIRED FIRST STEP — mount Tailwind in your app
+
+`globals.css` deliberately ships **no** `@tailwind` directives. The app owns
+Tailwind's entry point; emitting the directives here too would double-generate
+Tailwind's base/preflight when both stylesheets are imported. So **your app's CSS
+entry must contain the three directives itself**:
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+If you skip this, **zero Tailwind utilities are generated** and every page collapses
+to a broken single column — yet the design system's own `.ps-*` classes keep working,
+so it looks like a layout bug rather than a missing build step. Import order at the
+app root: your Tailwind entry **first**, then `import '@/design/globals.css';`, so the
+`.ps-*` identity wins over Tailwind's preflight. (See `preview.entry.tsx` +
+`preview-tailwind.css` in this folder for exactly this wiring.)
+
+---
+
 ## What W6 must merge
 
 The `package.json`, `tsconfig.json`, `vite.config.ts`, `tailwind.config.ts`,
@@ -87,7 +109,9 @@ import '@/design/globals.css';
 ```
 This provides the fonts, the light + `MOONLIT PUNIVERSE` theme variables, the dotted
 paper surface (`.ps-surface`), the focus ring and every keyframe/`.ps-*` class the
-components rely on. **The components will not look right without it.**
+components rely on. **The components will not look right without it.** Note this file
+does **not** include the `@tailwind` directives — you mount those yourself (see the
+⚠️ REQUIRED FIRST STEP at the top).
 
 ### 5. Dark theme
 Toggle by setting `data-theme="night"` on `<html>` (or any wrapper):
@@ -153,7 +177,18 @@ Hooks (also exported): `useReducedMotion`, `useTypewriter`, `usePointerTilt`,
   confetti, tilt and the flip (→ crossfade).
 - **Accessibility:** real `<button>`s (CardFlip/SlimeCard/PixelButton are keyboard
   operable), a visible on-brand dashed focus ring, `aria-label` on icon-only controls,
-  `role="progressbar"` on stat bars, and AA-legible pill text chosen by WCAG contrast.
+  `role="progressbar"` on stat bars, AA-legible pill text chosen by WCAG contrast, and
+  full titles exposed via a visually-hidden `.ps-sr-only` span (never `aria-label` on a
+  role-less element — informational pills carry `role="img"`/`role="timer"` so their
+  label is announced as one unit). `npm run axe` reports **0 violations** on the preview
+  (the only `incomplete` item is `color-contrast`, which axe cannot auto-compute over the
+  dotted/gradient backgrounds; it was verified AA by hand).
+  > **Accessibility contract for the app:** the components are axe-clean, but page-level
+  > landmark rules (`landmark-one-main`, `region`) are the app's job — wrap your routes
+  > in `<header>`/`<main>`/`<footer>` (the preview does this). SlimeCard's `locked` state
+  > deliberately hides the name, type, rarity house tag **and** the holo intensity so a
+  > silhouette never spoils its tier; a broken `imageSrc` degrades to the procedural
+  > sprite via `onError`.
 - **No `any`; `tsc --noEmit` clean** under `strict: true`.
 - **Motion budget:** every discrete transition/reveal is ≤600 ms (flip and pop-in are
   capped at .6s). The ambient idle loops (squish/bob/breathe/pulse) are the mockup's
@@ -181,4 +216,5 @@ npm install        # dev harness deps (W6 does NOT need this)
 npm run typecheck  # tsc --noEmit  → clean
 npm run dev        # vite preview at http://localhost:5173/
 npm run shot       # Playwright screenshots (needs `npx playwright install chromium`)
+npm run axe        # @axe-core/playwright audit of the preview → 0 violations
 ```
