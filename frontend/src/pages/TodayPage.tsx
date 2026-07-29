@@ -16,7 +16,6 @@ import {
   Chip,
   Confetti,
   Countdown,
-  HoloCard,
   PixelButton,
   RARITY_ORDER,
   RarityBadge,
@@ -29,7 +28,7 @@ import {
   type ConfettiHandle,
   type StatKey,
 } from '@/design';
-import { useCard, useCards, useToday } from '@/api/client';
+import { useCards, useToday } from '@/api/client';
 import { ApiRequestError } from '@/api/client';
 import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
 import { useAmbientStore } from '@/store/ambient';
@@ -47,153 +46,58 @@ const EPIC_INDEX = RARITY_ORDER.indexOf('EPIC');
  * happening. Presenting this as an error would be both wrong and a poor first
  * impression, since it is the state every visitor sees for fourteen hours a day.
  */
-/** Decorative floating sparkles. Purely visual, so hidden from assistive tech. */
-function Sparkles({ count = 10 }: { count?: number }): ReactElement {
-  const reduced = useReducedMotion();
-  const marks = ['✦', '✧', '⋆', '✩', '❋'];
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {Array.from({ length: count }, (_, i) => {
-        const left = (i * 37) % 92;
-        const delay = (i * 0.9) % 7;
-        const size = 11 + ((i * 5) % 12);
-        return (
-          <span
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${left}%`,
-              bottom: '-8%',
-              fontSize: size,
-              color: i % 3 === 0 ? tokens.color.sunbeam : tokens.color.bubblegum,
-              opacity: 0.85,
-              animation: reduced
-                ? 'none'
-                : `ps-drift ${9 + (i % 5)}s linear ${delay}s infinite`,
-            }}
-          >
-            {marks[i % marks.length]}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
 
 /**
- * The slime discovered before the one still forming.
+ * The collection so far, as a horizontal rail.
  *
- * The waiting page is what a visitor sees for fourteen hours a day, and a lone
- * question mark gives them nothing to look at and no reason to stay. Showing the
- * previous slime in full turns the wait into a hand-off: here is what yesterday
- * produced, and something just like it is on its way.
+ * Shared by the waiting page and the bloomed page so the layout does not rearrange
+ * itself at 10:00. A rail rather than a fixed grid: with two slimes a six-column grid
+ * leaves one card marooned beside five empty cells, which reads as broken rather than
+ * as early. A rail looks deliberate at two and scrolls sideways at fifty.
  */
-function PreviousSlime(): ReactElement | null {
+function RecentRail({ excludeSerial }: { excludeSerial?: number }): ReactElement {
   const navigate = useNavigate();
-  const reduced = useReducedMotion();
-  const recent = useCards({ sort: 'newest', size: 1 });
-  const summary = recent.data?.items?.[0];
-  const detail = useCard(summary?.serial);
-  const card = detail.data;
-
-  if (!summary) return null;
-
-  const palette = card ? paletteBackground(card) : undefined;
-  const stats: ReadonlyArray<[StatKey, number]> = card
-    ? [
-        ['strength', card.strength],
-        ['endurance', card.endurance],
-        ['agility', card.agility],
-        ['happiness', card.happiness],
-      ]
-    : [];
+  const recent = useCards({ sort: 'newest', size: 12 });
+  const items = (recent.data?.items ?? [])
+    .filter((c) => c.serial !== excludeSerial)
+    .slice(0, 10);
 
   return (
-    <aside
-      aria-labelledby="previous-heading"
-      className="relative w-full overflow-hidden rounded-xl border-4 border-ink p-6 shadow-card md:p-8"
-      style={{
-        background: palette ?? tokens.color.cream,
-        animation: reduced ? 'none' : 'ps-bobin .7s var(--ps-pop) both',
-      }}
-    >
-      <Sparkles count={14} />
-
-      <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8">
-        {/* Artwork */}
-        <button
-          type="button"
-          onClick={() => navigate(`/slime/${summary.serial}`)}
-          className="ps-focusable w-full max-w-[230px] shrink-0 rounded-lg"
-          style={{ animation: reduced ? 'none' : 'ps-breathe 5.5s ease-in-out infinite' }}
-          aria-label={`See ${summary.name}, the previously discovered slime`}
-        >
-          <HoloCard imageAlt={`${summary.name}, a ${summary.rarity} ${summary.type} slime`}>
-            <SmartImage
-              src={summary.thumbUrl}
-              thumb={summary.thumbUrl}
-              alt={`${summary.name}, a ${summary.rarity} ${summary.type} slime`}
-              sizes="230px"
-            />
-          </HoloCard>
-        </button>
-
-        {/* Identity + stats + actions */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-col items-center gap-3 md:items-start">
-            <Ribbon icon="✧" tone={tokens.color.mint}>
-              PREVIOUSLY DISCOVERED
-            </Ribbon>
-            <h2 id="previous-heading" className="font-pixel text-[26px] text-ink">
-              {summary.name}
-            </h2>
-            <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
-              <RarityBadge rarity={summary.rarity} />
-              <TypePill type={summary.type} />
-              <Chip>LV {summary.level}</Chip>
-              {summary.shiny ? (
-                <Chip tone={tokens.color.sunbeam} icon="✨">
-                  SHINY
-                </Chip>
-              ) : null}
-              {typeof card?.smileYield === 'number' ? (
-                <Chip tone={tokens.color.sky} icon="✨">
-                  +{card.smileYield.toLocaleString()} $SMILE
-                </Chip>
-              ) : null}
-              {summary.onChain ? (
-                <Chip tone={tokens.color.mint} icon="⛓">
-                  ON-CHAIN
-                </Chip>
-              ) : null}
-            </div>
-          </div>
-
-          {stats.length > 0 ? (
-            <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-              {stats.map(([stat, value], i) => (
-                <StatBar key={stat} stat={stat} value={value} index={i} />
-              ))}
-            </div>
-          ) : null}
-
-          {card?.quote ? (
-            <p className="text-center font-stat text-[13px] italic text-ink-soft md:text-left">
-              “{card.quote}”
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-            <PixelButton variant="ghost" onClick={() => navigate(`/slime/${summary.serial}`)}>
-              ✦ MEET {summary.name.toUpperCase()}
-            </PixelButton>
-            <span className="font-stat text-[11px] tracking-[1px] text-ink-soft">
-              {summary.cardId} · {formatMintDate(summary.mintDate)}
-            </span>
-          </div>
-        </div>
+    <section className="w-full" aria-labelledby="recent-heading">
+      <div className="mb-1 flex items-center gap-4">
+        <h2 id="recent-heading" className="shrink-0 font-pixel text-[15px] text-ink">
+          RECENTLY BLOOMED
+        </h2>
+        <span
+          aria-hidden
+          className="h-[6px] flex-1 rounded-pill"
+          style={{
+            background: `repeating-linear-gradient(90deg, ${tokens.color.bubblegum} 0 14px, ${tokens.color.sunbeam} 14px 28px, ${tokens.color.mint} 28px 42px, ${tokens.color.sky} 42px 56px)`,
+          }}
+        />
       </div>
-    </aside>
+      <p className="mb-4 font-stat text-[12px] tracking-[1px] text-ink-soft">
+        The last slimes to fall out of the Rain.
+      </p>
+      {items.length === 0 ? (
+        <p className="font-stat text-[12px] tracking-[2px] text-ink-soft">
+          The garden is just getting started.
+        </p>
+      ) : (
+        <ul className="flex snap-x gap-4 overflow-x-auto pb-3">
+          {items.map((item, i) => (
+            <li key={item.serial} className="w-[178px] shrink-0 snap-start">
+              <SlimeCard
+                card={toSlimeCardData(item)}
+                index={i}
+                isNew={i === 0}
+                onOpen={(serial) => navigate(`/slime/${serial}`)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -207,12 +111,8 @@ function PreBloom(): ReactElement {
 
       <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
 
-      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
-        <div className="order-2 min-w-0 lg:order-1">
-          <PreviousSlime />
-        </div>
-
-        <div className="order-1 flex flex-col items-center gap-6 lg:order-2">
+      <div className="grid w-full gap-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+        <div className="w-full max-w-[360px] justify-self-center lg:justify-self-start">
         <div
           role="img"
           aria-label="Today's slime has not bloomed yet"
@@ -265,30 +165,39 @@ function PreBloom(): ReactElement {
           STILL CONDENSING
         </span>
         </div>
+        </div>
 
-        <Countdown label="NEXT SLIME IN" />
+        <div className="flex min-w-0 flex-col gap-5">
+          <Countdown label="NEXT SLIME IN" />
+
+          <h2 className="font-pixel text-[30px] leading-tight text-ink">Today’s Bloom:</h2>
+          <p
+            aria-hidden
+            className="font-pixel text-[30px] leading-tight"
+            style={{ color: tokens.color.bubblegum, letterSpacing: '0.18em' }}
+          >
+            ?????
+          </p>
+          <p className="max-w-lg font-round text-ink-soft" style={{ lineHeight: 1.7 }}>
+            Every dawn, exactly <b>one</b> new slime condenses out of the Great Pixel Rain.
+            Today’s has not finished forming — come back at <b>10:00 Paris</b> and it will be
+            waiting, face down, for you to turn over.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <PixelButton variant="ghost" onClick={() => navigate('/dex')}>
+              ▦ BROWSE THE SLIMEDEX
+            </PixelButton>
+          </div>
         </div>
       </div>
 
-      <p
-        className="max-w-xl text-center"
-        style={{ fontFamily: tokens.font.round, color: tokens.color.inkSoft, lineHeight: 1.7 }}
-      >
-        Every dawn, exactly <b>one</b> new slime condenses out of the Great Pixel Rain.
-        Today’s has not finished forming — come back at <b>10:00 Paris</b> and it will be
-        waiting, face down, for you to turn over.
-      </p>
-
-      <PixelButton variant="ghost" onClick={() => navigate('/dex')}>
-        ▦ BROWSE THE SLIMEDEX
-      </PixelButton>
+      <RecentRail />
     </div>
   );
 }
 
 export function TodayPage(): ReactElement {
   const today = useToday();
-  const recent = useCards({ sort: 'newest', size: 8 });
   const reduced = useReducedMotion();
   const navigate = useNavigate();
   const confettiRef = useRef<ConfettiHandle>(null);
@@ -349,10 +258,9 @@ export function TodayPage(): ReactElement {
     ['happiness', card.happiness],
   ];
 
-  const recentItems = (recent.data?.items ?? []).filter((c) => c.serial !== card.serial).slice(0, 6);
 
   return (
-    <div className="flex flex-col items-center gap-10">
+    <div className="flex flex-col gap-10">
       <Confetti ref={confettiRef} />
 
       <section className="ps-hero w-full">
@@ -362,50 +270,13 @@ export function TodayPage(): ReactElement {
           subtitle="TODAY’S BLOOM HAS ARRIVED"
           rainbow={card.rarity === 'MYTHIC'}
         />
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-          <Ribbon icon="✦" tone={tokens.color.bubblegum}>
-            DAY {data.dayNumber}
-          </Ribbon>
-          <Countdown target={new Date(data.nextBloomAt)} label="NEXT SLIME IN" />
-        </div>
       </section>
 
-      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        {/* The collection so far, laid out along the left so it reads before the fold. */}
-        <section
-          className="order-2 min-w-0 lg:order-1"
-          aria-labelledby="recent-heading"
-        >
-          <h2
-            id="recent-heading"
-            className="mb-4 text-center font-pixel text-[15px] text-ink lg:text-left"
-          >
-            RECENTLY BLOOMED
-          </h2>
-          {recentItems.length === 0 ? (
-            <p className="text-center font-stat text-[12px] tracking-[2px] text-ink-soft lg:text-left">
-              The garden is just getting started — today’s is the very first.
-            </p>
-          ) : (
-            // A horizontal rail rather than a grid: with two slimes a six-column grid
-            // left one card marooned beside five empty cells. A rail is honest at any
-            // count, and scrolls sideways instead of pushing the card below the fold.
-            <ul className="flex snap-x gap-4 overflow-x-auto pb-3">
-              {recentItems.map((item, i) => (
-                <li key={item.serial} className="w-[168px] shrink-0 snap-start">
-                  <SlimeCard
-                    card={toSlimeCardData(item)}
-                    index={i}
-                    isNew={i === 0}
-                    onOpen={(serial) => navigate(`/slime/${serial}`)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div ref={shakeRef} className="order-1 w-full max-w-[340px] justify-self-center lg:order-2">
+      {/* Card on the left, everything about it on the right — the mockup's layout.
+          Anything else leaves the right half of the fold empty, which is what the
+          previous arrangement did. */}
+      <div className="grid w-full gap-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+        <div ref={shakeRef} className="w-full max-w-[360px] justify-self-center lg:justify-self-start">
           <CardFlip
             onReveal={handleReveal}
             seal="✦ PIXEL RAIN ✦"
@@ -416,54 +287,97 @@ export function TodayPage(): ReactElement {
               src={card.imageUrl}
               thumb={card.thumbUrl}
               alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
-              sizes="(max-width: 640px) 88vw, 340px"
+              sizes="(max-width: 640px) 88vw, 360px"
               eager
             />
           </CardFlip>
         </div>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <Ribbon icon="✦" tone={tokens.color.bubblegum}>
+              DAY {data.dayNumber} · {formatMintDate(card.mintDate).toUpperCase()}
+            </Ribbon>
+            <Countdown target={new Date(data.nextBloomAt)} label="NEXT SLIME IN" />
+          </div>
+
+          {revealed ? (
+            <div className="flex flex-col gap-4 animate-fade-up">
+              <div>
+                <h2 className="font-pixel text-[30px] leading-tight text-ink">{card.name}</h2>
+                <p className="mt-2 font-stat text-[12px] tracking-[2px] text-ink-soft">
+                  {card.cardId} · LV {card.level}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <RarityBadge rarity={card.rarity} />
+                <TypePill type={card.type} />
+                {card.shiny ? (
+                  <Chip tone={tokens.color.sunbeam} icon="✨">
+                    SHINY
+                  </Chip>
+                ) : null}
+                {typeof card.smileYield === 'number' ? (
+                  <Chip tone={tokens.color.sky} icon="✨">
+                    +{card.smileYield.toLocaleString()} $SMILE
+                  </Chip>
+                ) : null}
+                {card.onChain ? (
+                  <Chip tone={tokens.color.mint} icon="⛓">
+                    ON-CHAIN
+                  </Chip>
+                ) : null}
+              </div>
+
+              <p className="font-round text-ink">{card.personality}</p>
+              <p className="font-stat text-[13px] italic text-ink-soft">“{card.quote}”</p>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {stats.map(([stat, value], i) => (
+                  <StatBar key={stat} stat={stat} value={value} index={i} />
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <PixelButton variant="sunbeam" onClick={() => navigate(`/slime/${card.serial}`)}>
+                  ◆ VIEW PROFILE
+                </PixelButton>
+                <Link to="/dex" className="ps-focusable">
+                  <PixelButton variant="ghost">▦ OPEN SLIMEDEX</PixelButton>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5">
+              <h2 className="font-pixel text-[30px] leading-tight text-ink">
+                Today’s Bloom:
+              </h2>
+              <p
+                aria-hidden
+                className="font-pixel text-[30px] leading-tight"
+                style={{ color: tokens.color.bubblegum, letterSpacing: '0.18em' }}
+              >
+                ?????
+              </p>
+              <p className="max-w-lg font-round text-ink-soft" style={{ lineHeight: 1.7 }}>
+                A new slime has condensed out of the Pixel Rain. Turn the card over to
+                catalogue it in the SLIMEDEX before it drifts away…
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <PixelButton variant="sunbeam" onClick={handleReveal}>
+                  ◆ REVEAL TODAY’S SLIME
+                </PixelButton>
+                <Link to="/dex" className="ps-focusable">
+                  <PixelButton variant="ghost">▦ OPEN SLIMEDEX</PixelButton>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {revealed ? (
-        <section
-          className="w-full max-w-2xl rounded-xl border-4 border-ink bg-paper p-6 shadow-card animate-fade-up"
-          aria-label={`${card.name} details`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-pixel text-[20px] text-ink">{card.name}</h2>
-              <p className="mt-1 font-stat text-[12px] tracking-[2px] text-ink-soft">
-                {card.cardId} · LV {card.level} · {formatMintDate(card.mintDate)}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <RarityBadge rarity={card.rarity} />
-              <TypePill type={card.type} />
-            </div>
-          </div>
-
-          <p className="mt-4 font-round text-ink">{card.personality}</p>
-          <p className="mt-2 font-stat text-[13px] italic text-ink-soft">“{card.quote}”</p>
-
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {stats.map(([stat, value], i) => (
-              <StatBar key={stat} stat={stat} value={value} index={i} />
-            ))}
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <PixelButton variant="sunbeam" onClick={() => navigate(`/slime/${card.serial}`)}>
-              See the stored bytes →
-            </PixelButton>
-            <Link to="/dex" className="ps-focusable">
-              <PixelButton variant="ghost">Browse the SLIMEDEX</PixelButton>
-            </Link>
-          </div>
-        </section>
-      ) : (
-        <p className="max-w-md text-center font-stat text-[13px] tracking-[2px] text-ink-soft">
-          A brand-new slime blooms every day at 10:00 Paris time. Flip today’s card to meet it.
-        </p>
-      )}
+      <RecentRail excludeSerial={card.serial} />
     </div>
   );
 }
