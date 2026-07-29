@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.asmdb import AsmDbNotFound
 from app.asmdb import Row as AsmDbRow
 from app.chain import AnchorReceipt, AnchorResult, build_anchor_row_from_result
 from app.chain.config import ChainSettings, load_chain_settings
@@ -45,18 +46,32 @@ class CardAnchorer(Protocol):
         ...
 
 
-class RowWriter(Protocol):
-    """Writes one addressed row — satisfied by :class:`app.asmdb.AsmDbClient`.
+class AnchorRowStore(Protocol):
+    """Reads and writes the single addressed anchor row — satisfied by :class:`AsmDbClient`.
 
-    The anchor row is deliberately *not* written through the repository's
-    :meth:`write_card_rows`. That method validates its input as the complete,
-    contiguous set of parts for one card starting at part zero, which is right for a
-    card write and wrong for a lone part 8 arriving hours later. Using ``upsert``
-    keeps the whole-card invariant intact instead of loosening it to accommodate a
-    different kind of write, and it makes a re-run harmless.
+    The anchor row is deliberately *not* handled through the repository's card
+    methods. :meth:`JobRepository.write_card_rows` validates its input as the
+    complete contiguous set of parts for one card starting at zero, and
+    :meth:`JobRepository.read_card_rows` returns only those same card parts — the
+    part 8 anchor is invisible to it. Addressing the row directly keeps the
+    whole-card invariant intact and lets a re-run detect its own previous success.
     """
 
+    async def get(self, row_id: int) -> AsmDbRow: ...
+
     async def upsert(self, row: AsmDbRow) -> AsmDbRow: ...
+
+
+class BloomRecorder(Protocol):
+    """Records the economic half of a bloom — satisfied by :class:`ClaimPoolWriter`.
+
+    Kept separate from :class:`CardAnchorer` because the two do genuinely different
+    things: anchoring mints the SLIME card (ERC-721) and is *not* repeatable, while
+    recording the bloom moves SMILE (ERC-20) — burning the fee out of the finite
+    Genesis Rain and minting the yield into the Claim Pool.
+    """
+
+    def record_bloom(self, serial: int, rarity: str, happiness: int) -> bytes | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,8 +79,9 @@ class AnchorDependencies:
     """Injected boundaries so the job runs against a stub with no chain present."""
 
     repository: JobRepository
-    writer: RowWriter
+    writer: AnchorRowStore
     anchorer: CardAnchorer
+    bloom: BloomRecorder | None = None
     token_uri_base: str = DEFAULT_TOKEN_URI_BASE
 
 
@@ -97,15 +113,22 @@ async def anchor_serial(serial: int, *, deps: AnchorDependencies) -> AnchorOutco
     writing a meaningless commitment to a public chain.
     """
     with card_context(serial):
+        anchor_row_id = serial * 16 + _ANCHOR_PART
+
+        # Ask for the anchor row by its deterministic id. read_card_rows cannot answer
+        # this: it returns the card's own contiguous parts and never part 8, so relying
+        # on it made every run re-scan chain logs for work already done.
+        try:
+            await deps.writer.get(anchor_row_id)
+        except AsmDbNotFound:
+            pass
+        else:
+            _log.info("anchor_row_already_present", serial=serial)
+            return AnchorOutcome(serial=serial, anchored=False)
+
         rows = await deps.repository.read_card_rows(serial)
         if not rows:
             raise LookupError(f"serial {serial} has no rows in asmDB; nothing to anchor")
-
-        # An anchor row already present means a previous run got all the way through.
-        anchor_row_id = serial * 16 + _ANCHOR_PART
-        if any(row.id == anchor_row_id for row in rows):
-            _log.info("anchor_row_already_present", serial=serial)
-            return AnchorOutcome(serial=serial, anchored=False)
 
         card = _card_from_rows([r for r in rows if r.id != anchor_row_id])
         digest = card_hash(card)
@@ -124,6 +147,7 @@ async def anchor_serial(serial: int, *, deps: AnchorDependencies) -> AnchorOutco
                 return AnchorOutcome(serial=serial, anchored=False)
             _log.info("anchor_recovered_existing_mint", serial=serial)
             await deps.writer.upsert(to_asmdb_rows([build_anchor_row_from_result(recovered)])[0])
+            _record_bloom(deps, card)
             return AnchorOutcome(
                 serial=serial,
                 anchored=True,
@@ -139,11 +163,37 @@ async def anchor_serial(serial: int, *, deps: AnchorDependencies) -> AnchorOutco
             tx=receipt.tx_hash.hex() if receipt.tx_hash else None,
             block=receipt.block_number,
         )
+        _record_bloom(deps, card)
         return AnchorOutcome(
             serial=serial,
             anchored=True,
             tx_hash=receipt.tx_hash,
             block_number=receipt.block_number,
+        )
+
+
+def _record_bloom(deps: AnchorDependencies, card: Card) -> None:
+    """Fire the economic half of the bloom, without ever endangering the anchor row.
+
+    Ordering matters. The anchor row is written *first* and this runs after, because
+    the row is the record that the card is on-chain: losing it would send the next run
+    back to mint a card the chain already has. Recording the bloom is retryable, so a
+    failure here is logged and swallowed rather than propagated — and because the
+    anchor row now exists, a later re-run will short-circuit before re-minting.
+    """
+    if deps.bloom is None:
+        return
+    try:
+        deps.bloom.record_bloom(card.serial, card.rarity, card.happiness)
+    except Exception as exc:
+        # A dropped bloom is a real hole in the ten-year schedule, so it is loud.
+        _log.error("bloom_record_failed", serial=card.serial, error=str(exc))
+    else:
+        _log.info(
+            "bloom_recorded",
+            serial=card.serial,
+            rarity=card.rarity,
+            happiness=card.happiness,
         )
 
 
@@ -174,6 +224,36 @@ def _build_anchorer(settings: ChainSettings) -> CardAnchorer:
     )
 
 
+def _build_bloom_recorder(settings: ChainSettings, anchorer: CardAnchorer) -> BloomRecorder | None:
+    """Build the Claim Pool writer, or ``None`` when no pool is configured.
+
+    Returning ``None`` rather than raising keeps anchoring usable on its own: a
+    deployment that has cards but no economy yet should still be able to publish
+    fingerprints, and the caller treats a missing recorder as "skip the economy".
+    """
+    from web3 import HTTPProvider, Web3
+    from web3.middleware import ExtraDataToPOAMiddleware
+
+    from app.chain import build_signer
+    from app.chain.bloom import ClaimPoolWriter
+
+    if not settings.pool_address:
+        _log.warning("bloom_recorder_disabled", reason="CLAIM_POOL_ADDRESS is not set")
+        return None
+    if not settings.rpc_url:
+        return None
+
+    del anchorer
+    web3 = Web3(HTTPProvider(settings.rpc_url, request_kwargs={"timeout": 60}))
+    web3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+    return ClaimPoolWriter(
+        web3,
+        settings.pool_address,
+        build_signer(settings),
+        chain_id=settings.chain_id,
+    )
+
+
 async def _run(serials: list[int]) -> None:
     """Anchor each serial in turn, against the real asmDB and the real chain."""
     from app.asmdb import AsmDbClient, AsmDbRepository
@@ -193,7 +273,12 @@ async def _run(serials: list[int]) -> None:
     asmdb = AsmDbClient(settings.asmdb_url, secrets.asmdb_bearer_for_client())
     try:
         repository = AsmDbRepository(asmdb)
-        deps = AnchorDependencies(repository=repository, writer=asmdb, anchorer=anchorer)
+        deps = AnchorDependencies(
+            repository=repository,
+            writer=asmdb,
+            anchorer=anchorer,
+            bloom=_build_bloom_recorder(chain_settings, anchorer),
+        )
         targets = serials or await repository.list_card_serials()
         for serial in targets:
             try:

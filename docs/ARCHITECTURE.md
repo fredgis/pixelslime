@@ -323,8 +323,90 @@ Simulating all 3,650 blooms in Foundry ends with the Genesis Rain at **exactly z
 SMILE** in existence — all of it earned, none of it decreed. It is a knife-edge: bloom 3,651 reverts,
 and a day skipped and never backfilled leaves dust forever. That makes the backfill job structural.
 
-Transactions are signed by an **Azure Key Vault secp256k1 key** — the private key never leaves the HSM,
-and `v` recovery plus low-`s` normalisation are done client-side because Key Vault returns only `(r,s)`.
+### 6.1 Two tokens, one letter apart
+
+The system deploys **two different tokens**, and confusing them is the easiest mistake to make when
+reading a block explorer. They are not variants of each other — they are different standards doing
+different jobs.
+
+| | `0xD88928B5…432Baf7f` | `0x0BBaC39B…4B39b798` |
+|---|---|---|
+| Name | PixelSlime **Card** | PixelSlime **Smile** |
+| Symbol | **SLIME** | **SMILE** |
+| Standard | **ERC-721** (non-fungible) | **ERC-20** (fungible) |
+| Decimals | none — indivisible | 18 |
+| What it is | **the cards themselves** | **the money** |
+| Supply | one token per slime, ever | 365,660 and growing |
+| Mochibo | `SLIME #1`, owned by the Vault | — |
+
+Read it as a card game: **SLIME is the card you hold, SMILE is the coin you spend.** You cannot own
+half a Mochibo; you can own half a SMILE.
+
+Both branches of §6 move **SMILE**. The **SLIME** token is what the anchor mints and what adoption
+eventually transfers out of the Vault.
+
+> ⚠️ **Known footgun.** `SLIME` and `SMILE` are anagram-adjacent and easy to misread in logs and
+> explorer tabs. This is tolerable on a testnet; renaming the NFT symbol to something unmistakable
+> (e.g. `PSCARD`) is on the list before any value-bearing deployment.
+
+### 6.2 How the transactions are signed — and why not Key Vault
+
+The design called for an **Azure Key Vault secp256k1 key**, so the private key would never leave the
+HSM. `KeyVaultSigner` is written, tested, and still the preferred path — but it **cannot be used in
+this subscription**. The `KeyVault_PublicNetwork_Modify` policy at management-group scope forces
+`publicNetworkAccess: Disabled` and reverts any change within seconds, and no private endpoint for
+Key Vault was provisioned, so its data plane is unreachable from the app.
+
+Amoy therefore signs with a raw key held in a **Container Apps secret**. That is a real reduction in
+security, not an equivalent alternative: anyone with RBAC on the container app can read it. It is
+acceptable only because these tokens carry no value.
+
+Rather than leave that as a warning comment for a future reader to respect, the limit is enforced:
+
+```python
+if settings.chain_id not in TESTNET_CHAIN_IDS:
+    raise SignerError("refusing the in-process LocalSigner ...")
+```
+
+Pointing this configuration at a value-bearing chain **fails closed**. Restoring the Key Vault path
+means adding a private endpoint for the vault — the VNet that §2 already builds makes that a small
+change.
+
+### 6.3 Deployed on Polygon Amoy — live addresses
+
+| Contract | Address | Role |
+|---|---|---|
+| `SmileToken` | [`0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798`](https://amoy.polygonscan.com/token/0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798) | the $SMILE currency |
+| `PixelSlimeCard` | [`0xD88928B55CefcAe756e55824a48342cA432Baf7f`](https://amoy.polygonscan.com/token/0xD88928B55CefcAe756e55824a48342cA432Baf7f) | the SLIME cards |
+| `ClaimPool` | `0x02a6887730894E39B437eB0A4AB457d98167Fc0f` | burns the fee, mints the yield |
+| `SlimeAdoption` | `0x20d6A4F365d00b4d27726f13093Dc2C497473CcA` | spend $SMILE to adopt |
+
+**Invariants read back off the live chain, not asserted from the source:**
+
+| Check | Expected | Actual |
+|---|---|---|
+| Genesis Rain in Treasury | 365,000 | ✅ 365,000 at deploy |
+| Bloom fee | 100 | ✅ 100 |
+| Admin can mint $SMILE | **false** | ✅ `false` |
+| Treasury can mint $SMILE | **false** | ✅ `false` |
+| ClaimPool can mint $SMILE | true | ✅ `true` |
+
+The two `false` rows are the whole point: **the purse that pays the fee cannot print more of it.**
+
+**PS-0001 Mochibo, verified end to end:**
+
+| | Value |
+|---|---|
+| Mint tx | [`0x6a1c3c6e…bce6260e`](https://amoy.polygonscan.com/tx/0x6a1c3c6e5879851568bcf934b273aa5979f26de6cd9c248043dae133bce6260e) |
+| Block | 43,516,915 |
+| Owner | the Vault (Treasury) |
+| `cardHash` on-chain | `0xe99e4c83…62e7af0a` |
+| `cardHash` from the API | `0xe99e4c83…62e7af0a` — **identical** |
+| Bloom tx | [`0xa29bcec7…f6276ac7`](https://amoy.polygonscan.com/tx/0xa29bcec720a3d34c5973c07fb3b186345c4343ca25cbe5ce9e202676f6276ac7) |
+| Burned | 100 $SMILE (Treasury → `0x0`) |
+| Minted | 760 $SMILE (`0x0` → ClaimPool) = happiness 95 × EPIC ×8 |
+
+After that single bloom: Genesis Rain **364,900**, Claim Pool **760**, total supply **365,660**.
 
 ---
 

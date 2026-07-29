@@ -24,6 +24,7 @@ from app.codec import Card, card_hash, encode, encode_stream
 
 from . import contracts
 from .chain import ChainAnchor, chain_api_dict
+from .economy import smile_yield
 from .time import mint_date
 
 
@@ -103,6 +104,7 @@ def card_detail(
         "thumbUrl": thumb_url(card.serial),
         "chain": chain_api_dict(chain) if chain is not None else None,
         "onChain": chain is not None,
+        "smileYield": smile_yield(card),
     }
     house = contracts.rarity_houses().get(card.rarity)
     if house is not None:

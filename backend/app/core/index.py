@@ -30,15 +30,20 @@ from app.codec import RARITIES, TYPES, Card, CodecError
 
 from .chain import ChainAnchor, chain_from_storage_dict, chain_storage_dict
 from .logging import get_logger
+from .economy import (
+    BLOOM_FEE,
+    GENESIS_RAIN_TOTAL,
+    MAX_BLOOMS,
+    genesis_burned,
+    genesis_remaining,
+    smile_yield,
+)
 from .source import CardSource
 from .time import mint_date, paris_today, yyyymmdd
 
 _log = get_logger(__name__)
 
-# ── Economy, from docs/PLAN.md §8.6 (the chain is the real ledger; W9) ───────
-GENESIS_RAIN_TOTAL = 365_000
-BLOOM_FEE = 100
-MAX_BLOOMS = 3_650
+__all__ = ["BLOOM_FEE", "GENESIS_RAIN_TOTAL", "MAX_BLOOMS", "CardIndex"]
 
 SORTS = frozenset({"newest", "oldest", "rarest", "happiest"})
 
@@ -287,15 +292,20 @@ class CardIndex:
         """Collection-wide counters, including the economy projection (§8.6)."""
         by_rarity = dict.fromkeys(RARITIES, 0)
         by_type = dict.fromkeys(TYPES, 0)
+        pool = 0
         for entry in self._by_serial.values():
             by_rarity[entry.card.rarity] += 1
             by_type[entry.card.type] += 1
+            pool += smile_yield(entry.card)
         total = self.size
         return {
             "total": total,
             "byRarity": by_rarity,
             "byType": by_type,
-            "genesisRemaining": max(0, GENESIS_RAIN_TOTAL - total * BLOOM_FEE),
+            "genesisRemaining": genesis_remaining(total),
+            "genesisBurned": genesis_burned(total),
+            "genesisTotal": GENESIS_RAIN_TOTAL,
+            "poolTotal": pool,
             "bloomsRemaining": max(0, MAX_BLOOMS - total),
         }
 

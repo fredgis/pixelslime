@@ -63,6 +63,11 @@ class ChainSettings(BaseSettings):
         validation_alias="CARD_CONTRACT_ADDRESS",
         description="Deployed PixelSlimeCard address (the anchor target).",
     )
+    pool_address: str | None = Field(
+        default=None,
+        validation_alias="CLAIM_POOL_ADDRESS",
+        description="Deployed ClaimPool address; recordBloom burns the fee and mints yield.",
+    )
 
     # ── Raw-key signer, permitted on testnets only (see chain/signer.py) ────
     allow_local_signer: bool = Field(

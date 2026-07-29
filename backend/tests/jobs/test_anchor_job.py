@@ -16,6 +16,7 @@ from dataclasses import replace
 import pytest
 
 from _jobs_helpers import FakeAsmDb, build_card
+from app.asmdb import AsmDbNotFound
 from app.chain import AnchorReceipt, AnchorResult, decode_anchor_row
 from app.codec import card_hash, encode
 from app.jobs.anchor import AnchorDependencies, anchor_serial
@@ -61,28 +62,54 @@ class StubAnchorer:
         return self.recovered
 
 
+class StubBloomRecorder:
+    """Stands in for ClaimPool.recordBloom."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls: list[tuple[int, str, int]] = []
+
+    def record_bloom(self, serial: int, rarity: str, happiness: int) -> bytes | None:
+        if self.fail:
+            raise RuntimeError("pool unreachable")
+        self.calls.append((serial, rarity, happiness))
+        return b"\xbb" * 32
+
+
 class FakeRepository:
-    """The slice of the W3 repository the anchor job touches."""
+    """The slice of the W3 repository the anchor job touches.
+
+    Mirrors the real repository in one easily-missed way: ``read_card_rows`` returns
+    the card's own contiguous parts and **not** the part 8 anchor row. An earlier
+    version of this fake returned everything, which let a bug through — the job
+    believed it could detect an existing anchor from this call alone, and in
+    production it therefore re-scanned chain logs on every single run.
+    """
 
     def __init__(self, db: FakeAsmDb) -> None:
         self._db = db
 
     async def read_card_rows(self, serial: int) -> list[object]:
         prefix = f"psc.{serial}."
-        return [row for row in self._db.rows.values() if str(row.tag).startswith(prefix)]
+        return [
+            row
+            for row in self._db.rows.values()
+            if str(row.tag).startswith(prefix) and row.id % 16 != 8
+        ]
 
 
 class FakeRowWriter:
-    """Writes one addressed row, the way asmDB's upsert does.
-
-    The anchor row is a standalone part 8, not a member of a contiguous card write,
-    so it deliberately does *not* go through the repository's whole-card writer —
-    that one rejects any set of rows which does not start at part zero.
-    """
+    """Reads and writes one addressed row, the way asmDB's get/upsert do."""
 
     def __init__(self, db: FakeAsmDb) -> None:
         self._db = db
         self.written: list[object] = []
+
+    async def get(self, row_id: int) -> object:
+        row = self._db.rows.get(row_id)
+        if row is None:
+            raise AsmDbNotFound("missing row", code="not_found", status_code=404)
+        return row
 
     async def upsert(self, row: object) -> object:
         self._db.rows[row.id] = row  # type: ignore[attr-defined]
@@ -212,6 +239,47 @@ async def test_recovery_is_skipped_when_the_chain_cannot_find_the_mint() -> None
 
     assert outcome.anchored is False
     assert (1 * 16 + 8) not in db.rows
+
+
+@pytest.mark.asyncio
+async def test_a_successful_anchor_records_the_bloom() -> None:
+    # Anchoring mints the SLIME card; recording the bloom is what moves SMILE — it
+    # burns the fee out of the finite Genesis Rain and mints the yield into the pool.
+    # Without this the economy never starts, and a skipped day can never be recovered
+    # because the reserve drains on a fixed 3,650-bloom schedule.
+    deps, _, card = _seeded()
+    recorder = StubBloomRecorder()
+    deps = replace(deps, bloom=recorder)
+
+    await anchor_serial(1, deps=deps)
+
+    assert recorder.calls == [(1, card.rarity, card.happiness)]
+
+
+@pytest.mark.asyncio
+async def test_the_bloom_is_not_recorded_twice_for_the_same_card() -> None:
+    deps, _, _ = _seeded()
+    recorder = StubBloomRecorder()
+    deps = replace(deps, bloom=recorder)
+
+    await anchor_serial(1, deps=deps)
+    await anchor_serial(1, deps=deps)
+
+    assert len(recorder.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_bloom_failure_does_not_lose_the_anchor() -> None:
+    # The anchor row is the record that the card is on-chain. If recording the bloom
+    # fails — an RPC blip, an exhausted reserve — that row must still be written, or
+    # the next run would try to mint a card the chain already has.
+    deps, db, _ = _seeded()
+    deps = replace(deps, bloom=StubBloomRecorder(fail=True))
+
+    outcome = await anchor_serial(1, deps=deps)
+
+    assert outcome.anchored is True
+    assert (1 * 16 + 8) in db.rows
 
 
 def test_encode_is_importable() -> None:

@@ -1,213 +1,248 @@
-# 🫧 EASYLEARN — PixelSlime expliqué simplement
+# 🍡 EASYLEARN — PIXELSLIME explained without jargon
 
-> Où est l'application, où est la blockchain, et comment tout ça marche.
-> Pas de jargon inutile. Pour le détail technique : [`ARCHI.md`](ARCHI.md) et [`PLAN.md`](PLAN.md).
-
----
-
-## En une phrase
-
-**Chaque jour à 10h00 heure de Paris, une intelligence artificielle dessine une carte de collection
-unique, la range dans une base de données minuscule, et en grave l'empreinte sur une blockchain.**
-
-Personne ne clique sur rien. Ça tourne tout seul.
+> Where the site lives, where the blockchain lives, and how the whole thing works —
+> written for someone who has never deployed anything.
+>
+> For the engineering detail, read [`ARCHITECTURE.md`](ARCHITECTURE.md) and
+> [`HOWITWORKS.md`](HOWITWORKS.md). This page is the plain-language version.
 
 ---
 
-## 1. Où est l'application ?
+## 1. What PIXELSLIME actually is
 
-| Quoi | Où | À quoi ça sert |
-|---|---|---|
-| **Le site web** | `www.pixelslime.cloud` | Ce que tu vois : la carte du jour, la galerie, la fiche de chaque slime |
-| **Le cerveau** | Azure Container Apps, à Stockholm | Sert le site **et** l'API. Un seul programme, une seule adresse |
-| **Les images** | Azure Blob Storage | Les PNG des cartes, ~2 Mo chacun |
-| **Les données** | asmDB Cloud (`smilesdb`) | Le nom, les stats, le pouvoir… en **175 octets par carte** |
-| **Le réveil** | Azure Container Apps Job | Se lève deux fois par jour, ne travaille qu'à 10h Paris |
-| **La blockchain** | Polygon Amoy (réseau de test) | L'empreinte de chaque carte, pour prouver qu'elle existait |
+Every day at **10:00 Paris time**, a machine wakes up and invents **one** creature that has never
+existed. It writes its name, its personality, its powers. It draws it. It puts it on a trading card.
+Then it goes back to sleep for a day.
 
-Tout est dans un seul groupe de ressources Azure : `FGI-ASMDBPIXELSMILES`.
-
----
-
-## 2. Ce qui se passe chaque matin
+Nobody chooses the creature. Nobody approves it. There is exactly one per day, forever, and once a
+day is gone it never comes back.
 
 ```mermaid
 flowchart LR
-    A(["⏰ 10h00<br/>Paris"]) --> B["🎲 On tire<br/>la rareté"]
-    B --> C["✍️ L'IA écrit<br/>la carte"]
-    C --> D["🎨 L'IA dessine<br/>la carte"]
-    D --> E["🔍 On vérifie<br/>que ça colle"]
-    E --> F["💾 On range<br/>l'image + les données"]
-    F --> G["🔗 On grave<br/>l'empreinte"]
-    G --> H(["✨ La carte<br/>est en ligne"])
+    CLOCK(["🕙 10:00 Paris"]) --> AI["🎨 the machine invents<br/>a slime nobody has seen"]
+    AI --> CARD["🃏 it becomes a card<br/>name · stats · powers"]
+    CARD --> DB[("🗄️ stored in a database<br/><b>in 175 bytes</b>")]
+    CARD --> CHAIN["⛓️ its fingerprint is published<br/>on a public blockchain"]
+    DB --> WEB["🌐 www.pixelslime.cloud"]
+    CHAIN --> WEB
 
-    classDef t fill:#FFF6E5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
     classDef c fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef a fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
-    classDef v fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef s fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef k fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef o fill:#FFF6E5,stroke:#FF7A59,stroke-width:4px,color:#2B1B4A
-
-    class A t
-    class B c
-    class C,D a
-    class E v
-    class F s
-    class G k
-    class H o
+    classDef a fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef d fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef w fill:#7FE3C0,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    class CLOCK c
+    class AI,CARD a
+    class DB,CHAIN d
+    class WEB w
 ```
 
-**Le détail qui compte** : la rareté est tirée **par le programme**, pas par l'IA. Sinon le modèle
-ferait des cartes légendaires tous les jours parce que c'est plus amusant à écrire. Le programme
-tire : 45 % de communes, 27 % de peu communes… et 0,5 % de mythiques.
+---
 
-Et si la carte dessinée ne correspond pas aux données écrites, **elle est refaite**. Une carte qui
-annonce « niveau 12 » alors que la base dit 14 ne sera jamais publiée.
+## 2. Where everything lives
+
+| Thing | Where | Address |
+|---|---|---|
+| 🌐 The website | Microsoft Azure, Sweden | **https://www.pixelslime.cloud** |
+| 🗄️ The card data | asmDB Cloud (external service) | `asmdb.cloud` |
+| 🖼️ The images | Azure private storage | reachable only through the site |
+| ⛓️ The blockchain | **Polygon Amoy** (a public test network) | see §5 |
+| 🔑 The secrets | Container Apps secrets | never in the code |
+
+The site is **public**. No account, no password, no cookie, no tracking. There is nothing to log in
+to, which is also why there is no personal data to lose.
 
 ---
 
-## 3. Le truc bizarre : 175 octets
+## 3. The 175-byte constraint — the most unusual part
 
-La base de données choisie, **asmDB**, a une contrainte inhabituelle : chaque ligne ne peut contenir
-que **175 caractères de texte**. Pas 175 kilo-octets. 175 octets.
+The database has one hard rule: **each row can hold at most 175 characters of text.**
 
-Une carte complète — nom, personnalité, pouvoir, description, citation, plus une douzaine de nombres —
-c'est normalement **700 octets** de JSON. Il fallait diviser par quatre.
+A card written normally — as plain JSON — takes about **660 characters**. Nearly four times too much.
+
+So the card is compressed:
 
 ```mermaid
 flowchart LR
-    J["<b>La carte en JSON</b><br/>~700 octets<br/><i>lisible mais énorme</i>"]
-    P["<b>On compacte les nombres</b><br/>32 octets d'en-tête<br/><i>le niveau tient sur 1 octet,<br/>au lieu des 11 caractères qu'il<br/>prend écrit en JSON</i>"]
-    Z["<b>On compresse les textes</b><br/>avec un dictionnaire<br/><i>le vocabulaire PixelSlime<br/>est connu d'avance</i>"]
-    R[("<b>52 octets</b><br/>une seule ligne<br/><i>65 des 175 utilisés</i>")]
+    J["📄 <b>Plain JSON</b><br/>~660 characters<br/><i>far too big</i>"]
+    P["<b>Pack the numbers</b><br/>level fits in 1 byte<br/><i>instead of the 11 characters<br/>it takes written out</i>"]
+    Z["<b>Compress the text</b><br/>with a shared dictionary<br/>of words slimes always use"]
+    E["<b>Re-encode</b><br/>into safe characters"]
+    R["✅ <b>65 characters</b><br/>fits in one row<br/><i>110 to spare</i>"]
 
-    J --> P --> Z --> R
+    J --> P --> Z --> E --> R
 
-    classDef big  fill:#FF7A59,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
-    classDef mid  fill:#FFD86B,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef bad  fill:#FF7A59,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
+    classDef step fill:#E7DCFF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
     classDef good fill:#7FE3C0,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
-
-    class J big
-    class P,Z mid
+    class J bad
+    class P,Z,E step
     class R good
 ```
 
-**Mochibo, la première carte, occupe 65 octets sur les 175 disponibles.** Une carte bavarde en prend
-deux lignes. Le système en accepte quatre au maximum, donc il y a de la marge.
-
-Sur le site, la fiche de chaque slime affiche ces octets bruts — c'est le panneau **« THE 175 BYTES »**.
-Ce n'est pas de la décoration : c'est littéralement ce qui est stocké.
+Mochibo, the first slime, takes **65 of the 175 characters**. And we proved mathematically that the
+largest card the rules permit still fits — so no future slime can ever overflow.
 
 ---
 
-## 4. Où est la blockchain, et à quoi elle sert
+## 4. Two tokens, one letter apart — SLIME vs SMILE
+
+This trips everyone up, so it deserves its own section.
+
+There are **two** things on the blockchain, and they are not versions of each other:
 
 ```mermaid
 flowchart TB
-    subgraph OFF["Hors chaîne — les vraies données"]
-      IMG["🖼️ L'image PNG<br/><i>~2 Mo, dans Azure</i>"]
-      DAT["📦 Les 175 octets<br/><i>dans asmDB</i>"]
+    subgraph NFT["🃏 SLIME — the card"]
+        S1["<b>PixelSlime Card</b><br/>symbol: SLIME<br/>one token per slime, ever<br/><i>you cannot own half a Mochibo</i>"]
     end
-
-    HASH["🔐 <b>keccak256</b><br/>une empreinte de 32 octets<br/><i>change du tout au tout si<br/>un seul octet bouge</i>"]
-
-    subgraph ON["Sur la chaîne — Polygon Amoy"]
-      NFT["🎴 <b>Un NFT par carte</b><br/>numéro + empreinte + lien"]
-      TOK["🪙 <b>Le jeton \$SMILE</b>"]
+    subgraph COIN["🪙 SMILE — the money"]
+        S2["<b>PixelSlime Smile</b><br/>symbol: SMILE<br/>a normal divisible currency<br/><i>you can own half a SMILE</i>"]
     end
+    NFT -->|"you spend SMILE<br/>to adopt a SLIME"| COIN
 
-    DAT --> HASH --> NFT
-    IMG -.->|référencée| NFT
-    NFT -.-> TOK
-
-    classDef off  fill:#8FD3FF,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
-    classDef h    fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
-    classDef on   fill:#C08BFF,stroke:#2B1B4A,stroke-width:3px,color:#FFFFFF
-
-    class IMG,DAT off
-    class HASH h
-    class NFT,TOK on
+    classDef n fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef m fill:#8FD3FF,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    class S1 n
+    class S2 m
 ```
 
-### Ce qui est sur la blockchain
+| | SLIME | SMILE |
+|---|---|---|
+| What it is | **the cards themselves** | **the money** |
+| Standard | ERC-721 (like a numbered painting) | ERC-20 (like coins in a wallet) |
+| Divisible? | ❌ no | ✅ yes, to 18 decimals |
+| How many | one per slime — 3,650 maximum | 365,660 today, and it grows |
+| Mochibo | is `SLIME #1` | — |
 
-**Pas l'image. Pas les données.** Seulement leur **empreinte** — 32 octets calculés à partir des
-175 octets stockés.
+**Think of a card game: SLIME is the card you hold, SMILE is the coin you spend.**
 
-Pourquoi ? Parce qu'écrire 2 Mo sur une blockchain coûterait une fortune et n'apporterait rien.
-L'empreinte, elle, suffit à **prouver** qu'une carte donnée existait, telle quelle, ce jour-là.
-
-Si quelqu'un modifiait Mochibo dans la base — ne serait-ce qu'une lettre — l'empreinte recalculée
-ne correspondrait plus à celle gravée. La fraude serait visible immédiatement.
-
-> C'est l'idée que j'aime le plus dans ce projet : **la contrainte des 175 octets est devenue la
-> fonctionnalité.** Ces octets compacts sont exactement ce qu'on peut se permettre de graver.
-
-### Le jeton $SMILE, en trois phrases
-
-Au départ, une réserve **finie** de 365 000 $SMILE : la *Genesis Rain*. Chaque carte publiée en
-**brûle 100** — et cette réserve n'est **jamais** rechargée. Au bout de **3 650 cartes, soit
-exactement dix ans**, elle est vide.
-
-En parallèle, chaque carte **crée** du $SMILE proportionnel à son bonheur et à sa rareté — mais dans
-une **caisse séparée** que la réserve ne peut pas toucher. C'est ce qui rend la taxe réelle : celui
-qui paie et celui qui gagne ne sont jamais la même poche.
-
-*(Un piège avait été évité de justesse : dans la version papier, le Trésor était aussi administrateur
-du contrat — il pouvait donc se recréer des jetons et vider la garantie de son sens. Les deux clés
-sont maintenant obligatoirement distinctes.)*
+> ⚠️ The two names are one letter apart, which is genuinely easy to misread on a block explorer.
+> That is a naming mistake worth correcting before this is ever used with real money.
 
 ---
 
-## 5. Ce qui tourne aujourd'hui, et ce qui ne tourne pas encore
+## 5. How the money works
 
-| | État |
+Two things happen every time a slime blooms, and they pull in **opposite directions**:
+
+```mermaid
+flowchart TB
+    T["<b>🌧️ THE RESERVE</b><br/>365,000 SMILE, created once<br/><b>never refilled, ever</b>"]
+    B(["🫧 a slime blooms"])
+    BURN["🔥 <b>100 SMILE destroyed</b><br/>gone forever"]
+    MINT["✨ <b>new SMILE created</b><br/>happiness × rarity"]
+    POOL["<b>💧 THE REWARD POOL</b><br/>a completely separate purse<br/><i>the reserve cannot touch it</i>"]
+
+    B --> BURN
+    T -->|shrinks| BURN
+    B --> MINT --> POOL
+
+    classDef res  fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    classDef blm  fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
+    classDef fire fill:#FF7A59,stroke:#2B1B4A,stroke-width:4px,color:#FFFFFF
+    classDef pool fill:#8FD3FF,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
+    class T res
+    class B,MINT blm
+    class BURN fire
+    class POOL pool
+```
+
+**The reserve only ever shrinks.** 365,000 ÷ 100 per card = **3,650 cards = exactly ten years.** When
+it reaches zero, no more slimes can ever bloom. That deadline is not a policy anyone can change; it is
+arithmetic baked into the contract.
+
+**The reward pool only ever grows.** Each card creates new SMILE using this formula:
+
+> **new SMILE = happiness × rarity multiplier**
+
+| Rarity | COMMON | UNCOMMON | RARE | EPIC | LEGENDARY | MYTHIC |
+|---|---|---|---|---|---|---|
+| multiplier | ×1 | ×2 | ×4 | ×8 | ×20 | ×100 |
+
+**Mochibo** — happiness 95, EPIC (×8) — created **760 SMILE**, while 100 were destroyed.
+
+### Why the two purses must be separate
+
+This is the single most important rule in the whole system:
+
+> **The one who pays and the one who earns are never the same purse.**
+
+If the reserve could create new SMILE, it would simply refill itself and the "cost" would be a
+pretence. So the contract forbids it, and we checked on the live chain rather than trusting the code:
+
+| Question | Answer |
 |---|---|
-| 🟢 Le site | **En ligne**, public, sans compte ni mot de passe |
-| 🟢 La base | **Mochibo (PS-0001) est dedans**, vérifié octet par octet |
-| 🟢 L'image | Dans Azure, liée à la carte par empreinte |
-| 🟢 Le job quotidien | **Armé** — se déclenchera demain à 10h00 Paris |
-| 🟡 Le domaine | `www.pixelslime.cloud` branché, certificat en cours |
-| 🔴 La blockchain | **Contrats écrits et testés, pas encore déployés** |
+| Can the administrator create SMILE? | ❌ **No** |
+| Can the reserve create SMILE? | ❌ **No** |
+| Can *anything* create SMILE? | ✅ Only the reward pool |
 
-### Pourquoi la blockchain n'est pas encore active
-
-Tout le code existe : quatre contrats, 46 tests, une simulation des 3 650 cartes qui vide la réserve
-à zéro exactement. Mais le déploiement demande deux choses que le programme ne peut pas décider seul :
-
-1. **Choisir les clés.** La clé administrateur doit être différente de la clé Trésor, sinon toute la
-   garantie économique s'effondre.
-2. **Des jetons de test.** Amoy est un réseau d'essai ; il faut demander des jetons gratuits à un
-   robinet public, ce qui passe par un formulaire humain.
-
-C'est écrit pas à pas dans [`RUNBOOK.md`](RUNBOOK.md).
+During development this protection was found to be **fake**: the administrator and the reserve were
+the same key, so the administrator could have granted itself permission and refilled the reserve. It
+now uses two separate keys, and the deployment script **refuses to run** if they are ever the same.
 
 ---
 
-## 6. Trois choses qui n'ont pas marché comme prévu
+## 6. What is running today
 
-Elles valent d'être connues, parce qu'elles expliquent pourquoi l'architecture a la forme qu'elle a.
+| | Status |
+|---|---|
+| 🟢 The website | **Live**, public, no account needed |
+| 🟢 The database | **Mochibo (PS-0001) is in it**, verified byte by byte |
+| 🟢 The image | In Azure, tied to the card by fingerprint |
+| 🟢 The blockchain | **Deployed on Polygon Amoy**, 4 contracts live |
+| 🟢 Mochibo on-chain | Minted, owned by the Vault, fingerprint matches exactly |
+| 🟢 The daily job | Armed — fires at 10:00 Paris |
+| 🟢 `www.pixelslime.cloud` | Live with HTTPS |
+| 🟡 `pixelslime.cloud` (no www) | Not yet attached |
 
-**Le fond transparent.** Le modèle d'image refuse de produire de la transparence sur l'endpoint qui
-accepte une image de référence. Solution : lui demander un fond blanc uni, puis découper ce blanc
-nous-mêmes. Et l'outil qui fait ce découpage est **exactement celui écrit au départ pour nettoyer
-l'image d'exemple** — l'outil d'entrée est devenu l'outil de sortie.
+**Mochibo, verified end to end:**
 
-**Le coffre-fort inaccessible.** Une règle de sécurité de l'entreprise interdit l'accès public aux
-coffres à secrets *et* aux espaces de stockage. Le mot de passe de la base a donc déménagé ailleurs,
-et il a fallu construire un réseau privé pour atteindre les images — ce qui a obligé à recréer
-l'environnement complet.
+| | |
+|---|---|
+| Mint transaction | [`0x6a1c3c6e…bce6260e`](https://amoy.polygonscan.com/tx/0x6a1c3c6e5879851568bcf934b273aa5979f26de6cd9c248043dae133bce6260e) |
+| Bloom transaction | [`0xa29bcec7…f6276ac7`](https://amoy.polygonscan.com/tx/0xa29bcec720a3d34c5973c07fb3b186345c4343ca25cbe5ce9e202676f6276ac7) |
+| Fingerprint in the database | `0xe99e4c83…62e7af0a` |
+| Fingerprint on the blockchain | `0xe99e4c83…62e7af0a` — **identical** |
 
-**Deux façons de trouver un fichier.** Deux parties du programme cherchaient le même fichier de deux
-manières différentes. L'une remontait l'arborescence jusqu'à le trouver, l'autre comptait les dossiers
-en dur. La première a survécu à la mise en conteneur, la seconde non — et ça n'a été visible qu'au
-premier vrai déploiement.
+That last pair is the whole promise: the card in the database and the card on the blockchain are
+provably the same card. Change one letter of Mochibo's name and the two would no longer match.
 
 ---
 
-<div align="center">
+## 7. Four things that did not go as planned
 
-**« Un slime, c'est un lieu, une émotion et un ami, écrasés ensemble. »**
+These are worth knowing, because they explain why the architecture looks the way it does.
 
-</div>
+**The transparent background.** The image model refuses to produce transparency on the endpoint that
+accepts a reference image. The fix: ask for a plain white background and cut the white out ourselves.
+The tool that does the cutting is **exactly the tool originally written to clean up the example
+image** — the entry tool became the exit tool.
+
+**The locked vault.** A company-wide security rule forbids public access to secret vaults *and* to
+storage accounts, and it undoes any change within seconds. The database password had to move
+elsewhere, and a private network had to be built to reach the images — which forced rebuilding the
+whole hosting environment. It also means the blockchain key is stored less securely than intended, so
+the code now **refuses to sign on any chain where the money is real**.
+
+**The lost mint.** A card was successfully published to the blockchain, and then the program stopped
+before it could write that fact to the database. Publishing cannot be repeated, so the card was
+stranded: provably on the blockchain, invisible to the site, with no way back. The program now knows
+how to go and read its own past transactions to recover.
+
+**Polygon speaks slightly differently.** The blockchain library rejected every single block, because
+Polygon's blocks carry more identifying data than the library expects. Testing had used a simulated
+chain that does not have this quirk — so it could only ever have been found against the real thing.
+
+---
+
+## 8. What happens next
+
+1. Each morning at 10:00 Paris a new slime blooms, automatically
+2. Shortly after, its fingerprint is published to the blockchain, automatically
+3. When enough cards exist, people will be able to earn SMILE and spend it to adopt slimes
+
+Nobody has to do anything for step 1 or 2. That is the point.
+
+---
+
+*PIXELSLIME · one slime a day, forever · 175 bytes of pure joy*
