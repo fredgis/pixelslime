@@ -13,8 +13,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   AnimatedTitle,
   CardFlip,
+  Chip,
   Confetti,
   Countdown,
+  HoloCard,
   PixelButton,
   RARITY_ORDER,
   RarityBadge,
@@ -27,7 +29,7 @@ import {
   type ConfettiHandle,
   type StatKey,
 } from '@/design';
-import { useCards, useToday } from '@/api/client';
+import { useCard, useCards, useToday } from '@/api/client';
 import { ApiRequestError } from '@/api/client';
 import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
 import { useAmbientStore } from '@/store/ambient';
@@ -45,56 +47,149 @@ const EPIC_INDEX = RARITY_ORDER.indexOf('EPIC');
  * happening. Presenting this as an error would be both wrong and a poor first
  * impression, since it is the state every visitor sees for fourteen hours a day.
  */
+/** Decorative floating sparkles. Purely visual, so hidden from assistive tech. */
+function Sparkles({ count = 10 }: { count?: number }): ReactElement {
+  const reduced = useReducedMotion();
+  const marks = ['✦', '✧', '⋆', '✩', '❋'];
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {Array.from({ length: count }, (_, i) => {
+        const left = (i * 37) % 92;
+        const delay = (i * 0.9) % 7;
+        const size = 11 + ((i * 5) % 12);
+        return (
+          <span
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${left}%`,
+              bottom: '-8%',
+              fontSize: size,
+              color: i % 3 === 0 ? tokens.color.sunbeam : tokens.color.bubblegum,
+              opacity: 0.85,
+              animation: reduced
+                ? 'none'
+                : `ps-drift ${9 + (i % 5)}s linear ${delay}s infinite`,
+            }}
+          >
+            {marks[i % marks.length]}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * The slime discovered before the one still forming.
  *
  * The waiting page is what a visitor sees for fourteen hours a day, and a lone
  * question mark gives them nothing to look at and no reason to stay. Showing the
- * previous slime turns the wait into a hand-off: here is what yesterday produced,
- * and something just like it is on its way.
+ * previous slime in full turns the wait into a hand-off: here is what yesterday
+ * produced, and something just like it is on its way.
  */
 function PreviousSlime(): ReactElement | null {
   const navigate = useNavigate();
+  const reduced = useReducedMotion();
   const recent = useCards({ sort: 'newest', size: 1 });
-  const card = recent.data?.items?.[0];
+  const summary = recent.data?.items?.[0];
+  const detail = useCard(summary?.serial);
+  const card = detail.data;
 
-  if (!card) return null;
+  if (!summary) return null;
+
+  const palette = card ? paletteBackground(card) : undefined;
+  const stats: ReadonlyArray<[StatKey, number]> = card
+    ? [
+        ['strength', card.strength],
+        ['endurance', card.endurance],
+        ['agility', card.agility],
+        ['happiness', card.happiness],
+      ]
+    : [];
 
   return (
     <aside
       aria-labelledby="previous-heading"
-      className="w-full max-w-[260px] rounded-xl border-4 border-ink p-4 shadow-card"
-      style={{ background: tokens.color.cream }}
+      className="relative w-full max-w-[420px] overflow-hidden rounded-xl border-4 border-ink p-6 shadow-card"
+      style={{
+        background: palette ?? tokens.color.cream,
+        animation: reduced ? 'none' : 'ps-bobin .7s var(--ps-pop) both',
+      }}
     >
-      <h2
-        id="previous-heading"
-        className="text-center font-pixel text-[10px] tracking-[1px] text-ink"
-      >
-        ✦ LAST DISCOVERED ✦
-      </h2>
+      <Sparkles />
 
-      <button
-        type="button"
-        onClick={() => navigate(`/slime/${card.serial}`)}
-        className="ps-focusable mt-3 block w-full rounded-lg border-4 border-ink"
-        style={{ background: tokens.color.paper, overflow: 'hidden' }}
-        aria-label={`See ${card.name}, the previous slime`}
-      >
-        <SmartImage
-          src={card.thumbUrl}
-          thumb={card.thumbUrl}
-          alt={`${card.name}, a ${card.rarity} ${card.type} slime`}
-          sizes="240px"
-        />
-      </button>
+      <div className="relative flex flex-col items-center gap-4">
+        <Ribbon icon="✧" tone={tokens.color.mint}>
+          PREVIOUSLY DISCOVERED
+        </Ribbon>
 
-      <p className="mt-3 text-center font-pixel text-[13px] text-ink">{card.name}</p>
-      <p className="mt-1 text-center font-stat text-[11px] tracking-[1px] text-ink-soft">
-        {card.cardId} · {formatMintDate(card.mintDate)}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-        <RarityBadge rarity={card.rarity} />
-        <TypePill type={card.type} />
+        <button
+          type="button"
+          onClick={() => navigate(`/slime/${summary.serial}`)}
+          className="ps-focusable w-full max-w-[250px] rounded-lg"
+          style={{ animation: reduced ? 'none' : 'ps-breathe 5.5s ease-in-out infinite' }}
+          aria-label={`See ${summary.name}, the previously discovered slime`}
+        >
+          <HoloCard imageAlt={`${summary.name}, a ${summary.rarity} ${summary.type} slime`}>
+            <SmartImage
+              src={summary.thumbUrl}
+              thumb={summary.thumbUrl}
+              alt={`${summary.name}, a ${summary.rarity} ${summary.type} slime`}
+              sizes="250px"
+            />
+          </HoloCard>
+        </button>
+
+        <h2 id="previous-heading" className="font-pixel text-[22px] text-ink">
+          {summary.name}
+        </h2>
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <RarityBadge rarity={summary.rarity} />
+          <TypePill type={summary.type} />
+          <Chip>LV {summary.level}</Chip>
+          {summary.shiny ? (
+            <Chip tone={tokens.color.sunbeam} icon="✨">
+              SHINY
+            </Chip>
+          ) : null}
+        </div>
+
+        {stats.length > 0 ? (
+          <div className="grid w-full grid-cols-2 gap-2">
+            {stats.map(([stat, value], i) => (
+              <StatBar key={stat} stat={stat} value={value} index={i} />
+            ))}
+          </div>
+        ) : null}
+
+        {card?.quote ? (
+          <p className="text-center font-stat text-[13px] italic text-ink-soft">
+            “{card.quote}”
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {typeof card?.smileYield === 'number' ? (
+            <Chip tone={tokens.color.sky} icon="✨">
+              +{card.smileYield.toLocaleString()} $SMILE
+            </Chip>
+          ) : null}
+          {summary.onChain ? (
+            <Chip tone={tokens.color.mint} icon="⛓">
+              ON-CHAIN
+            </Chip>
+          ) : null}
+        </div>
+
+        <p className="font-stat text-[11px] tracking-[1px] text-ink-soft">
+          {summary.cardId} · {formatMintDate(summary.mintDate)}
+        </p>
+
+        <PixelButton variant="ghost" onClick={() => navigate(`/slime/${summary.serial}`)}>
+          ✦ MEET {summary.name.toUpperCase()}
+        </PixelButton>
       </div>
     </aside>
   );
@@ -110,8 +205,8 @@ function PreBloom(): ReactElement {
 
       <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
 
-      <div className="flex w-full flex-col items-center justify-center gap-8 lg:flex-row lg:items-start">
-        <div className="order-2 flex justify-center lg:order-1 lg:pt-10">
+      <div className="flex w-full flex-col items-center justify-center gap-10 lg:flex-row lg:items-center">
+        <div className="order-2 flex justify-center lg:order-1">
           <PreviousSlime />
         </div>
 

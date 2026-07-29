@@ -112,6 +112,95 @@ function TwinCounters({
   );
 }
 
+/** Live contracts on Polygon Amoy. Kept here so the numbers above can be audited. */
+const CONTRACTS: ReadonlyArray<{
+  label: string;
+  symbol?: string;
+  kind: string;
+  address: string;
+  path: 'token' | 'address';
+  note: string;
+}> = [
+  {
+    label: 'PixelSlime Card',
+    symbol: 'SLIME',
+    kind: 'ERC-721 · the cards',
+    address: '0xD88928B55CefcAe756e55824a48342cA432Baf7f',
+    path: 'token',
+    note: 'One token per slime, indivisible. Only ever grows.',
+  },
+  {
+    label: 'PixelSlime Smile',
+    symbol: 'SMILE',
+    kind: 'ERC-20 · the money',
+    address: '0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798',
+    path: 'token',
+    note: 'Burned 100 per bloom, minted as yield. 18 decimals.',
+  },
+  {
+    label: 'Claim Pool',
+    kind: 'holds the yield',
+    address: '0xbce1362c1155777df19F9cea6c8ECa68B155160d',
+    path: 'address',
+    note: 'The only address allowed to mint $SMILE.',
+  },
+  {
+    label: 'Treasury (Vault)',
+    kind: 'the Genesis Rain',
+    address: '0xb71C9B63ba13d2a34DD895A4De577661A963FaAc',
+    path: 'address',
+    note: 'Holds every card and the shrinking reserve. Cannot mint.',
+  },
+];
+
+/**
+ * Where to go and check any of this for yourself.
+ *
+ * Every figure on this page is a claim about a public ledger, and a claim nobody can
+ * verify is just a nicer-looking number. SLIME and SMILE are listed side by side
+ * because they are one letter apart and easy to confuse — one is the card, the other
+ * is the currency.
+ */
+function ContractDirectory(): ReactElement {
+  return (
+    <section aria-labelledby="contracts-heading">
+      <h2 id="contracts-heading" className="mb-2 text-center font-pixel text-[16px] text-ink">
+        VERIFY IT YOURSELF
+      </h2>
+      <p className="mb-5 text-center font-stat text-[12px] text-ink-soft">
+        Every number above is on a public chain. Polygon Amoy testnet.
+      </p>
+
+      <ul className="grid gap-3 md:grid-cols-2">
+        {CONTRACTS.map((c) => (
+          <li
+            key={c.address}
+            className="rounded-lg border-4 border-ink bg-cream p-4 shadow-card"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-pixel text-[12px] text-ink">{c.label}</span>
+              {c.symbol ? <Chip tone={tokens.color.sunbeam}>{c.symbol}</Chip> : null}
+            </div>
+            <p className="mt-1 font-stat text-[11px] tracking-[1px] text-ink-soft">{c.kind}</p>
+            <a
+              href={`https://amoy.polygonscan.com/${c.path}/${c.address}`}
+              target="_blank"
+              rel="noreferrer"
+              className="ps-focusable mt-2 block break-all font-stat text-[11px] underline"
+              style={{ color: tokens.color.grape }}
+            >
+              {c.address}
+            </a>
+            <p className="mt-2 font-round text-[13px] text-ink-soft" style={{ lineHeight: 1.5 }}>
+              {c.note}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function BankPage(): ReactElement {
   const stats = useStats();
   const recent = useCards({ sort: 'newest', size: 8 });
@@ -230,6 +319,8 @@ export function BankPage(): ReactElement {
           Expected yield ≈ 75 happiness × 3.31 average multiplier ≈ 248 $SMILE/day, against a 100 $SMILE burn.
         </p>
       </section>
+
+      <ContractDirectory />
 
       <section aria-labelledby="anchors-heading">
         <h2 id="anchors-heading" className="mb-5 text-center font-pixel text-[16px] text-ink">
