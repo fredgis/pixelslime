@@ -388,8 +388,14 @@ export interface paths {
                             byType: {
                                 [key: string]: number;
                             };
-                            /** @description SMILE left in the Genesis Rain */
+                            /** @description SMILE left in the Genesis Rain. Only ever decreases — the reserve is never refilled. */
                             genesisRemaining: number;
+                            /** @description SMILE destroyed so far, one flat 100 fee per bloom. The mirror image of `genesisRemaining`. */
+                            genesisBurned: number;
+                            /** @description The reserve's fixed starting size, 365000. Present so a client can draw a gauge without hard-coding it. */
+                            genesisTotal: number;
+                            /** @description SMILE minted into the Claim Pool across every bloom — the sum of each card's `smileYield`. Grows while `genesisRemaining` shrinks; the two are deliberately separate purses. */
+                            poolTotal: number;
                             /** @description Slimes that can still be minted */
                             bloomsRemaining: number;
                         };
@@ -583,6 +589,8 @@ export interface components {
             companion: string | null;
             /** @description Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present. */
             onChain: boolean;
+            /** @description Whole $SMILE this card mints into the Claim Pool when its bloom is recorded, as `happiness * rarity multiplier`. Computed locally from the very fields the contract is handed, so it cannot disagree with `ClaimPool.recordBloom`. Present whether or not the bloom has actually been recorded yet. */
+            smileYield?: number;
             /** @description Dominant colours of the artwork, so the UI can tint itself to the card. */
             palette?: string[];
             /** @description On-chain anchor. **Always present as a key; `null` when the card has not been anchored yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to distinguish absent from null. */

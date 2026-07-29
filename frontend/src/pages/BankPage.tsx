@@ -30,12 +30,96 @@ const FLOW: ReadonlyArray<{ icon: string; title: string; body: string; color: st
   { icon: '🧑‍🌾', title: 'ADOPT', body: 'Keepers claim $SMILE with an EIP-712 voucher, then spend it to adopt a slime out of the Vault.', color: tokens.color.mint },
 ];
 
+/**
+ * The two halves of a bloom, side by side and moving in opposite directions.
+ *
+ * This is the clearest way to show the rule the whole economy rests on: the purse
+ * that pays the fee is not the purse that earns the yield. Putting the draining
+ * reserve next to the filling pool makes that visible at a glance — and makes it
+ * obvious that the left number can never be replenished by the right one.
+ */
+function TwinCounters({
+  burned,
+  pool,
+  loading,
+}: {
+  burned: number;
+  pool: number;
+  loading: boolean;
+}): ReactElement {
+  return (
+    <section aria-labelledby="twin-heading" className="flex flex-col gap-4">
+      <h2
+        id="twin-heading"
+        className="text-center font-pixel text-[16px] text-ink"
+      >
+        EVERY BLOOM, TWO OPPOSITE MOVES
+      </h2>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <div
+          className="rounded-xl border-4 border-ink p-5 shadow-card"
+          style={{ background: tokens.color.coral }}
+        >
+          <p className="font-pixel text-[11px]" style={{ color: tokens.color.cream }}>
+            🔥 BURNED FROM THE RESERVE
+          </p>
+          <p
+            className="mt-2 font-pixel text-[24px] leading-tight"
+            style={{ color: tokens.color.cream }}
+            aria-live="polite"
+          >
+            {loading ? '…' : `−${burned.toLocaleString()}`}{' '}
+            <span className="text-[14px]">$SMILE</span>
+          </p>
+          <p className="mt-2 font-stat text-[12px]" style={{ color: tokens.color.cream }}>
+            100 per bloom, destroyed forever. This number only ever goes up, and the
+            reserve behind it only ever goes down.
+          </p>
+        </div>
+
+        <div
+          className="rounded-xl border-4 border-ink p-5 shadow-card"
+          style={{ background: tokens.color.sky }}
+        >
+          <p className="font-pixel text-[11px]" style={{ color: tokens.color.ink }}>
+            ✨ MINTED INTO THE CLAIM POOL
+          </p>
+          <p
+            className="mt-2 font-pixel text-[24px] leading-tight"
+            style={{ color: tokens.color.ink }}
+            aria-live="polite"
+          >
+            {loading ? '…' : `+${pool.toLocaleString()}`}{' '}
+            <span className="text-[14px]">$SMILE</span>
+          </p>
+          <p className="mt-2 font-stat text-[12px]" style={{ color: tokens.color.ink }}>
+            happiness × rarity, created fresh for each slime — into a purse the
+            reserve cannot reach.
+          </p>
+        </div>
+      </div>
+
+      <p
+        className="text-center font-stat text-[12px] text-ink-soft"
+        style={{ lineHeight: 1.7 }}
+      >
+        The one who <b>pays</b> and the one who <b>earns</b> are never the same purse.
+        That is what makes the fee real: if the reserve could mint, it would simply
+        refill itself.
+      </p>
+    </section>
+  );
+}
+
 export function BankPage(): ReactElement {
   const stats = useStats();
   const recent = useCards({ sort: 'newest', size: 8 });
 
   const genesisRemaining = stats.data?.genesisRemaining ?? GENESIS_TOTAL;
   const bloomsRemaining = stats.data?.bloomsRemaining ?? TOTAL_BLOOMS;
+  const genesisBurned = stats.data?.genesisBurned ?? 0;
+  const poolTotal = stats.data?.poolTotal ?? 0;
   const bloomed = TOTAL_BLOOMS - bloomsRemaining;
   const depletedPct = Math.min(100, Math.max(0, ((GENESIS_TOTAL - genesisRemaining) / GENESIS_TOTAL) * 100));
 
@@ -82,6 +166,12 @@ export function BankPage(): ReactElement {
           </>
         )}
       </section>
+
+      <TwinCounters
+        burned={genesisBurned}
+        pool={poolTotal}
+        loading={stats.isLoading}
+      />
 
       <section aria-labelledby="flow-heading">
         <h2 id="flow-heading" className="mb-5 text-center font-pixel text-[16px] text-ink">

@@ -107,6 +107,11 @@ export function ProfilePage(): ReactElement {
               <TypePill type={data.type} />
               <Chip>LV {data.level}</Chip>
               {data.shiny ? <Chip tone={tokens.color.sunbeam} icon="✨">SHINY</Chip> : null}
+              {typeof data.smileYield === 'number' ? (
+                <Chip tone={tokens.color.sky} icon="✨">
+                  +{data.smileYield.toLocaleString()} $SMILE
+                </Chip>
+              ) : null}
             </div>
             <p className="font-stat text-[12px] tracking-[2px] text-ink-soft">
               {data.cardId} · {formatMintDate(data.mintDate)}
@@ -119,6 +124,14 @@ export function ProfilePage(): ReactElement {
               <StatBar key={stat} stat={stat} value={value} index={i} />
             ))}
           </div>
+
+          {typeof data.smileYield === 'number' ? (
+            <YieldPanel
+              happiness={data.happiness}
+              rarity={data.rarity}
+              amount={data.smileYield}
+            />
+          ) : null}
 
           <section className="rounded-lg border-4 border-ink bg-paper p-5 shadow-card">
             <p className="font-round text-ink">{data.personality}</p>
@@ -159,6 +172,58 @@ interface ProvenancePanelProps {
   serial: number;
   open: boolean;
   onToggle: () => void;
+}
+
+/** Rarity multipliers, mirroring `chain/script/Deploy.s.sol` and `app/core/economy.py`. */
+const RARITY_MULTIPLIER: Record<string, number> = {
+  COMMON: 1,
+  UNCOMMON: 2,
+  RARE: 4,
+  EPIC: 8,
+  LEGENDARY: 20,
+  MYTHIC: 100,
+};
+
+/**
+ * What this card contributes to the economy, and the arithmetic behind it.
+ *
+ * The number is shown with its working because "760 $SMILE" on its own looks
+ * decreed. Spelling out `happiness × rarity` makes it checkable, and makes the
+ * incentive legible: a happier or rarer slime is worth more, by a rule nobody
+ * applies by hand.
+ */
+function YieldPanel({
+  happiness,
+  rarity,
+  amount,
+}: {
+  happiness: number;
+  rarity: string;
+  amount: number;
+}): ReactElement {
+  const multiplier = RARITY_MULTIPLIER[rarity] ?? 1;
+  return (
+    <section
+      aria-labelledby="yield-heading"
+      className="rounded-lg border-4 border-ink p-4 shadow-card"
+      style={{ background: tokens.color.sky }}
+    >
+      <h2 id="yield-heading" className="font-pixel text-[11px] text-ink">
+        ✨ THIS SLIME GENERATES
+      </h2>
+      <p className="mt-2 font-pixel text-[22px] leading-tight text-ink">
+        +{amount.toLocaleString()} <span className="text-[13px]">$SMILE</span>
+      </p>
+      <p className="mt-2 font-stat text-[12px] text-ink">
+        happiness <b>{happiness}</b> × {rarity} <b>×{multiplier}</b> ={' '}
+        <b>{amount.toLocaleString()}</b>
+      </p>
+      <p className="mt-2 font-round text-[13px] text-ink" style={{ lineHeight: 1.6 }}>
+        Minted fresh into the Claim Pool when this slime bloomed — while 100 $SMILE
+        were burned from the Genesis Rain. Two different purses, on purpose.
+      </p>
+    </section>
+  );
 }
 
 function ProvenancePanel({ serial, open, onToggle }: ProvenancePanelProps): ReactElement {
