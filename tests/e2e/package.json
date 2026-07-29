@@ -1,0 +1,19 @@
+{
+  "name": "@pixelslime/e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "W10 — QA and end-to-end integration harness. Builds the real (mock-off) SPA, boots the real backend against fake asmDB/blob seeded from contracts/cards, and drives it with Playwright to prove the frontend and backend actually agree on contracts/openapi.yaml.",
+  "scripts": {
+    "harness": "node harness.mjs",
+    "pw": "playwright test",
+    "pw:report": "playwright show-report reports/html"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@playwright/test": "1.61.1",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "js-yaml": "^4.1.0"
+  }
+}

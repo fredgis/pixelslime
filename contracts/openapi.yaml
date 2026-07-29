@@ -306,7 +306,8 @@ components:
       description: The full card. Mirrors contracts/card.schema.json plus derived display fields.
       required: [serial, cardId, name, level, rarity, type, height_mm, weight_g,
                  strength, endurance, agility, happiness,
-                 personality, power_name, power_desc, quote, mintDate, imageUrl, thumbUrl]
+                 personality, power_name, power_desc, quote, mintDate, dayNumber, imageUrl, thumbUrl, onChain, chain,
+                 biome, mood, companion]
       properties:
         serial:    { type: integer }
         cardId:    { type: string, example: "PS-0001" }
@@ -330,9 +331,9 @@ components:
         dayNumber: { type: integer, description: "This card's 1-based bloom ordinal - the nth slime ever to bloom. Distinct from `serial` only if a serial is ever skipped." }
         imageUrl:  { type: string }
         thumbUrl:  { type: string }
-        biome:     { type: string, nullable: true, description: "Display name resolved from `biome_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
-        mood:      { type: string, nullable: true, description: "Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
-        companion: { type: string, nullable: true, description: "Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.**" }
+        biome:     { type: [string, "null"], description: "Display name resolved from `biome_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
+        mood:      { type: [string, "null"], description: "Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
+        companion: { type: [string, "null"], description: "Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.**" }
         onChain:   { type: boolean, description: "Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present." }
         palette:
           type: array
@@ -340,7 +341,6 @@ components:
           items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
         chain:
           type: object
-          nullable: true
           description: >-
             On-chain anchor. **Always present as a key; `null` when the card has not been anchored
             yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to

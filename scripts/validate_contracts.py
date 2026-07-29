@@ -9,6 +9,7 @@ Usage:  python scripts/validate_contracts.py
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -100,15 +101,48 @@ def check_fixtures(validator: Draft202012Validator) -> None:
 
 
 def check_openapi() -> None:
+    raw = (CONTRACTS / "openapi.yaml").read_text(encoding="utf-8")
     spec = load_yaml_strict(CONTRACTS / "openapi.yaml")
-    if not str(spec.get("openapi", "")).startswith("3.1"):
+    version = str(spec.get("openapi", ""))
+    if not version.startswith("3.1"):
         fail("openapi.yaml is not OpenAPI 3.1")
     if not spec.get("paths"):
         fail("openapi.yaml declares no paths")
+
+    # `nullable` is OpenAPI 3.0 syntax. Under 3.1 (JSON Schema 2020-12) it is not a
+    # keyword at all, so it is silently ignored: a generator emits a non-nullable type
+    # and nothing complains. Use `type: [x, "null"]` instead.
+    if hits := re.findall(r"^\s*nullable:", raw, re.M):
+        fail(f"openapi.yaml uses the 3.0-only `nullable` keyword {len(hits)}x — "
+             'under 3.1 it is ignored. Use `type: [x, "null"]`.')
+
     for name, schema in spec.get("components", {}).get("schemas", {}).items():
         Draft202012Validator.check_schema(schema)
         _ = name
+
+    check_prose_matches_required(spec)
     print(f"  ok    openapi.yaml — {len(spec.get('paths', {}))} paths, no duplicate keys")
+
+
+def check_prose_matches_required(spec: dict) -> None:
+    """A description that promises a field is always present must be backed by `required`.
+
+    This is the exact hole W10 found: `Card.onChain` was documented as "Always present",
+    the `required` list omitted it, so `openapi-typescript` generated `onChain?: boolean`.
+    The frontend honoured the prose and the backend did not, and because the schema was
+    looser than the sentence, nothing caught the disagreement. Prose is not binding —
+    only the schema is — so anywhere the two can drift, they must be reconciled here.
+    """
+    for name, schema in spec.get("components", {}).get("schemas", {}).items():
+        required = set(schema.get("required") or [])
+        for field, definition in (schema.get("properties") or {}).items():
+            description = str(definition.get("description", ""))
+            promises = re.search(r"always present", description, re.I)
+            if promises and field not in required:
+                fail(
+                    f"{name}.{field} is documented as always present but is missing from "
+                    f"`required` — the schema is looser than its own description"
+                )
 
 
 def check_tokens() -> None:

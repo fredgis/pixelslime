@@ -1,0 +1,8 @@
+node_modules/
+reports/
+test-results/
+__pycache__/
+*.pyc
+
+# Screenshots are deliberately committed as evidence, but transient Playwright
+# artifacts are not. Keep the curated PNGs, ignore nothing else here by default.

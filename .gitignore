@@ -47,3 +47,8 @@ chain/cache/
 chain/broadcast/
 chain/lib/
 
+
+# e2e harness artefacts
+tests/e2e/reports/html/
+tests/e2e/reports/test-results/
+
