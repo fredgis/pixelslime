@@ -29,6 +29,32 @@ param asmdbBearerToken string = ''
 @secure()
 param adminToken string = ''
 
+@description('Scheme and host of the asmDB service.')
+param asmdbBaseUrl string = 'https://www.asmdb.cloud'
+
+@description('The 24-character asmDB instance suffix — the database this app reads and writes.')
+param asmdbInstance string = '<ASMDB_INSTANCE>'
+
+@description('''
+Which job the scheduled container runs. Normally 'daily'.
+
+Set to 'seed' (or 'backfill --from ... --to ...') and redeploy to run that instead, then
+set it back. This is deliberately an environment variable rather than a start-time command
+override: overriding a Container Apps Job's command replaces the whole container template
+and silently drops every environment variable it needs, which makes the job hang with no
+output at all.
+''')
+param jobCommand string = 'daily'
+
+@description('''
+Set true to let the daily job run outside its 10:00 Europe/Paris window.
+
+For seeding a fresh deployment or recovering a failed run. It does not bypass the
+date-idempotency check, so a forced run still cannot produce a second card for a day
+that already has one.
+''')
+param forceJobRun bool = false
+
 // Key Vault and Storage names cannot fit the full 13-character uniqueString value.
 var uniqueSuffix = take(uniqueString(resourceGroup().id), 10)
 var identityName = 'id-pixelslime'
@@ -115,6 +141,18 @@ module cognitiveServicesRole 'modules/cognitive-services-role.bicep' = {
   ]
 }
 
+module network 'modules/network.bicep' = {
+  name: 'network'
+  params: {
+    location: location
+    vnetName: 'vnet-pixelslime'
+    storageAccountName: storageAccountName
+  }
+  dependsOn: [
+    storage
+  ]
+}
+
 module containerApps 'modules/container-apps.bicep' = {
   name: 'container-apps'
   params: {
@@ -127,6 +165,11 @@ module containerApps 'modules/container-apps.bicep' = {
     managedIdentityName: identityName
     asmdbBearerToken: asmdbBearerToken
     adminToken: adminToken
+    asmdbBaseUrl: asmdbBaseUrl
+    asmdbInstance: asmdbInstance
+    acaSubnetId: network.outputs.acaSubnetId
+    jobCommand: jobCommand
+    forceJobRun: forceJobRun
     storageAccountName: storageAccountName
     registryName: containerRegistryName
     imageRepositoryName: imageRepositoryName

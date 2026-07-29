@@ -62,6 +62,21 @@ param asmdbBearerToken string = ''
 @secure()
 param adminToken string = ''
 
+@description('Scheme and host of the asmDB service.')
+param asmdbBaseUrl string
+
+@description('The 24-character asmDB instance suffix.')
+param asmdbInstance string
+
+@description('Resource id of the subnet the Container Apps environment is injected into.')
+param acaSubnetId string
+
+@description('Which job the daily container runs: daily, seed, or backfill with its arguments.')
+param jobCommand string = 'daily'
+
+@description('Let the daily job run outside its 10:00 Europe/Paris window.')
+param forceJobRun bool = false
+
 var asmDbSecretName = 'asmdb-bearer-token'
 var adminSecretName = 'admin-token'
 var containerImage = deployPlaceholderImage
@@ -71,6 +86,22 @@ var commonEnvironmentVariables = [
   {
     name: 'AZURE_CLIENT_ID'
     value: managedIdentity.properties.clientId
+  }
+  {
+    name: 'PIXELSLIME_JOB'
+    value: jobCommand
+  }
+  {
+    name: 'PIXELSLIME_FORCE'
+    value: forceJobRun ? '1' : '0'
+  }
+  {
+    name: 'ASMDB_BASE_URL'
+    value: asmdbBaseUrl
+  }
+  {
+    name: 'ASMDB_INSTANCE'
+    value: asmdbInstance
   }
   {
     name: 'STORAGE_ACCOUNT_NAME'
@@ -158,6 +189,21 @@ resource environment 'Microsoft.App/managedEnvironments@2025-07-01' = {
         sharedKey: logAnalytics.listKeys().primarySharedKey
       }
     }
+    // VNet injection is what lets the app resolve and reach the Storage private
+    // endpoint. A management-group policy forces publicNetworkAccess: Disabled on
+    // Storage and reverts any attempt to change it, so there is no public route to
+    // the card artwork. This property is immutable once set, which is why switching
+    // to it required recreating the environment.
+    vnetConfiguration: {
+      infrastructureSubnetId: acaSubnetId
+      internal: false
+    }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
     zoneRedundant: false
   }
 }
@@ -255,11 +301,15 @@ resource dailyJob 'Microsoft.App/jobs@2025-07-01' = {
           command: deployPlaceholderImage ? [] : [
             'python'
           ]
+          // Runs the multiplexer, which reads PIXELSLIME_JOB. Selecting the subcommand
+          // through an env var rather than a start-time command override matters: an
+          // override replaces the whole container template and silently drops every
+          // environment variable the job needs, so it hangs with no output at all.
           args: deployPlaceholderImage
             ? []
             : [
                 '-m'
-                'app.jobs.daily'
+                'app.jobs'
               ]
           env: containerEnvironmentVariables
           resources: {

@@ -235,3 +235,26 @@ class TestBuildSigner:
             CHAIN_LOCAL_PRIVATE_KEY=KV_PRIVATE_KEY,
         )
         assert build_signer(settings) is sentinel
+
+    def test_local_signer_refused_on_a_mainnet_chain(self) -> None:
+        # The Amoy rollout signs with a raw key held in a Container Apps secret,
+        # because the governance policy leaves the Key Vault data plane unreachable.
+        # That trade is only acceptable while the tokens are worthless, so the
+        # "testnet only" rule is enforced here rather than left to a docstring:
+        # pointing the same configuration at Polygon mainnet must fail closed.
+        settings = ChainSettings(
+            CHAIN_ID=137,
+            CHAIN_ALLOW_LOCAL_SIGNER=True,
+            CHAIN_LOCAL_PRIVATE_KEY=KV_PRIVATE_KEY,
+        )
+        with pytest.raises(SignerError, match="testnet"):
+            build_signer(settings)
+
+    @pytest.mark.parametrize("chain_id", [80002, 31337, 11155111])
+    def test_local_signer_allowed_on_known_testnets(self, chain_id: int) -> None:
+        settings = ChainSettings(
+            CHAIN_ID=chain_id,
+            CHAIN_ALLOW_LOCAL_SIGNER=True,
+            CHAIN_LOCAL_PRIVATE_KEY=KV_PRIVATE_KEY,
+        )
+        assert isinstance(build_signer(settings), LocalSigner)

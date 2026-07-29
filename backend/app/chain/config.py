@@ -64,16 +64,19 @@ class ChainSettings(BaseSettings):
         description="Deployed PixelSlimeCard address (the anchor target).",
     )
 
-    # ── Tests-only local signer escape hatch (never armed in production) ────
+    # ── Raw-key signer, permitted on testnets only (see chain/signer.py) ────
     allow_local_signer: bool = Field(
         default=False,
         validation_alias="CHAIN_ALLOW_LOCAL_SIGNER",
-        description="Tests only: permit the env-key LocalSigner. Must be false in prod.",
+        description=(
+            "Permit the in-process LocalSigner. Armed on Amoy because the Key Vault "
+            "data plane is policy-blocked; build_signer refuses it off a testnet."
+        ),
     )
     local_private_key: str | None = Field(
         default=None,
         validation_alias="CHAIN_LOCAL_PRIVATE_KEY",
-        description="Tests only: hex private key for LocalSigner. Never set in prod.",
+        description="Hex private key for LocalSigner. Testnet keys only.",
     )
 
 

@@ -28,6 +28,7 @@ import {
   type StatKey,
 } from '@/design';
 import { useCards, useToday } from '@/api/client';
+import { ApiRequestError } from '@/api/client';
 import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
 import { useAmbientStore } from '@/store/ambient';
 import { useDiscoveryStore } from '@/store/discovery';
@@ -35,6 +36,95 @@ import { SmartImage } from '@/components/SmartImage';
 import { ErrorState, LoadingState } from '@/components/States';
 
 const EPIC_INDEX = RARITY_ORDER.indexOf('EPIC');
+
+/**
+ * What the home page shows before the day's slime exists.
+ *
+ * The card sits face down in the rain, the countdown runs to the next 10:00 in Paris,
+ * and the copy says the slime is still condensing — because that is what is actually
+ * happening. Presenting this as an error would be both wrong and a poor first
+ * impression, since it is the state every visitor sees for fourteen hours a day.
+ */
+function PreBloom(): ReactElement {
+  const navigate = useNavigate();
+  return (
+    <div className="flex flex-col items-center gap-10">
+      <section className="ps-hero w-full">
+        <AnimatedTitle text="PIXELSLIME" eyebrow="PUNIPUNI PARADISE" />
+      </section>
+
+      <Ribbon>✦ THE PIXEL RAIN IS FALLING ✦</Ribbon>
+
+      <div
+        role="img"
+        aria-label="Today's slime has not bloomed yet"
+        style={{
+          position: 'relative',
+          width: 'min(360px, 80vw)',
+          aspectRatio: '1024 / 1536',
+          display: 'grid',
+          placeItems: 'center',
+          borderRadius: tokens.radius.lg,
+          border: `6px solid ${tokens.color.ink}`,
+          boxShadow: tokens.shadow.card,
+          background: `radial-gradient(circle at 50% 38%, rgba(255,255,255,.30), transparent 58%),
+            repeating-linear-gradient(45deg, #6C4FD6 0 16px, #7B5CE6 16px 32px)`,
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: 22,
+            fontFamily: tokens.font.pixel,
+            fontSize: 10,
+            letterSpacing: 2,
+            color: tokens.color.sunbeam,
+          }}
+        >
+          ✦ PIXEL RAIN ✦
+        </span>
+        <span
+          style={{
+            fontFamily: tokens.font.pixel,
+            fontSize: 68,
+            color: '#FFFFFF',
+            textShadow: '0 7px 0 rgba(0,0,0,.32)',
+          }}
+        >
+          ?
+        </span>
+        <span
+          style={{
+            position: 'absolute',
+            bottom: 26,
+            fontFamily: tokens.font.stat,
+            fontSize: 13,
+            letterSpacing: 2,
+            color: '#FFFFFF',
+            opacity: 0.9,
+          }}
+        >
+          STILL CONDENSING
+        </span>
+      </div>
+
+      <Countdown label="NEXT SLIME IN" />
+
+      <p
+        className="max-w-xl text-center"
+        style={{ fontFamily: tokens.font.round, color: tokens.color.inkSoft, lineHeight: 1.7 }}
+      >
+        Every dawn, exactly <b>one</b> new slime condenses out of the Great Pixel Rain.
+        Today’s has not finished forming — come back at <b>10:00 Paris</b> and it will be
+        waiting, face down, for you to turn over.
+      </p>
+
+      <PixelButton variant="ghost" onClick={() => navigate('/dex')}>
+        ▦ BROWSE THE SLIMEDEX
+      </PixelButton>
+    </div>
+  );
+}
 
 export function TodayPage(): ReactElement {
   const today = useToday();
@@ -77,6 +167,17 @@ export function TodayPage(): ReactElement {
   };
 
   if (today.isLoading) return <LoadingState label="Today’s bloom is opening…" />;
+
+  // A 404 is not a failure: it means the Pixel Rain has not condensed today's slime yet.
+  // Every fresh deployment hits this on day one, and so does every visitor between
+  // midnight and 10:00 Paris, so it deserves the ceremony rather than an error panel.
+  // The countdown is computed client-side because the endpoint that would carry it is
+  // the very one returning 404.
+  const notBloomedYet =
+    today.error instanceof ApiRequestError && today.error.status === 404;
+
+  if (notBloomedYet) return <PreBloom />;
+
   if (today.isError || !data || !card) {
     return <ErrorState label="Today’s bloom hasn’t arrived." onRetry={() => void today.refetch()} />;
   }

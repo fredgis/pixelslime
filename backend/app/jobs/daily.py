@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal
@@ -201,11 +202,22 @@ async def _unwired_main() -> None:
 
 
 async def run_scheduled(*, now_utc: datetime | None = None) -> DailyResult:
-    """Apply the Paris guard before secrets, clients or Azure SDKs are constructed."""
+    """Apply the Paris guard before secrets, clients or Azure SDKs are constructed.
+
+    ``PIXELSLIME_FORCE=1`` skips the guard. That exists so an operator can produce a
+    card on demand — seeding a fresh deployment, or recovering from a failed run —
+    without waiting for the next 10:00 in Paris. It does **not** skip the idempotency
+    check, so a forced run still cannot create a second card for a day that already
+    has one.
+    """
     now_paris = datetime.now(_PARIS) if now_utc is None else now_utc.astimezone(_PARIS)
-    if now_paris.hour != 10:
+    forced = os.environ.get("PIXELSLIME_FORCE", "").strip().lower() in {"1", "true", "yes"}
+
+    if now_paris.hour != 10 and not forced:
         _log.info("not 10:00 in Paris yet, standing down")
         return DailyResult(status="stood_down", mint_date=now_paris.date(), serial=None)
+    if forced and now_paris.hour != 10:
+        _log.warning("paris_guard_bypassed", reason="PIXELSLIME_FORCE is set", hour=now_paris.hour)
 
     from .runtime import production_dependencies
 

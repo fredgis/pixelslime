@@ -249,12 +249,14 @@ class KeyVaultSigner(_BaseSigner):
 
 
 class LocalSigner(_BaseSigner):
-    """TESTS ONLY — holds a raw private key from the environment.
+    """Holds a raw private key in process memory — testnets only.
 
-    This exists so the anchor and voucher paths can be exercised against a local
-    Anvil node without an HSM. It is **never** selected in production:
-    :func:`build_signer` requires an explicit opt-in flag before it will hand one
-    back, and this class logs a loud warning on construction. Do not use it to sign
+    Originally written so the anchor and voucher paths could be exercised against a
+    local Anvil node without an HSM. It is also what signs on Polygon Amoy, because
+    the Key Vault data plane is unreachable under the subscription's governance
+    policy. :func:`build_signer` will only hand one back when the escape hatch is
+    explicitly armed *and* the target chain is in :data:`TESTNET_CHAIN_IDS`, and this
+    class logs a loud warning on construction. Do not use it to sign anything of
     anything that touches real value.
     """
 
@@ -284,13 +286,25 @@ class LocalSigner(_BaseSigner):
         return normalize_signature(native.r, native.s, message_hash, self._address)
 
 
-def build_signer(settings: ChainSettings | None = None) -> Signer:
-    """Select the production Key Vault signer, or the tests-only local one.
+#: Chain ids on which a raw in-process key is an acceptable risk. Amoy is the
+#: deployed target; the others are local/CI nodes. Anything absent from this set
+#: is treated as real money and refuses the LocalSigner outright.
+TESTNET_CHAIN_IDS = frozenset({80002, 31337, 1337, 11155111})
 
-    Production requires ``KEY_VAULT_URI`` and ``CHAIN_SIGNER_KEY_NAME``. The
-    :class:`LocalSigner` is only ever returned when ``CHAIN_ALLOW_LOCAL_SIGNER`` is
-    explicitly set *and* a Key Vault key is **not** configured — it can never
-    silently shadow a real signer.
+
+def build_signer(settings: ChainSettings | None = None) -> Signer:
+    """Select the Key Vault signer, or the raw-key local one on a testnet.
+
+    Key Vault is preferred whenever ``KEY_VAULT_URI`` and ``CHAIN_SIGNER_KEY_NAME``
+    are both set, and can never be silently shadowed by the local signer.
+
+    The local signer is a deliberate, *bounded* concession. The subscription's
+    governance policy forces ``publicNetworkAccess: Disabled`` on Key Vault and
+    reverts any change within seconds, so the Amoy rollout signs with a key held in
+    a Container Apps secret instead. That is only defensible while the tokens carry
+    no value, so the concession is bounded by :data:`TESTNET_CHAIN_IDS` here in code
+    rather than by a comment asking future readers to be careful: aiming the same
+    configuration at a value-bearing chain fails closed.
     """
     settings = settings or ChainSettings()
 
@@ -302,7 +316,13 @@ def build_signer(settings: ChainSettings | None = None) -> Signer:
         )
 
     if settings.allow_local_signer and settings.local_private_key:
-        _log.warning("build_signer_local_fallback")
+        if settings.chain_id not in TESTNET_CHAIN_IDS:
+            raise SignerError(
+                f"refusing the in-process LocalSigner on chain {settings.chain_id}: "
+                "it is only permitted on a testnet "
+                f"({sorted(TESTNET_CHAIN_IDS)}). Use a Key Vault key instead."
+            )
+        _log.warning("build_signer_local_fallback", chain_id=settings.chain_id)
         return LocalSigner(settings.local_private_key)
 
     raise SignerError(

@@ -13,6 +13,7 @@ we refuse to run rather than emit bodies nobody can decode. See ``docs/CODEC.md`
 from __future__ import annotations
 
 import hashlib
+import os
 from functools import cache
 from pathlib import Path
 
@@ -23,8 +24,33 @@ _DICT_VERSION = 1
 _DICT_FILENAME = "psdict_v1.bin"
 _DICT_SHA256 = "a9cbf34dd2f51306cf165329bcf9a50efd1733fa6d787b5cdc866b37543889f0"
 
-# codec -> app -> backend -> repo root -> assets/
-_ASSETS_DIR = Path(__file__).resolve().parents[3] / "assets"
+
+def _assets_dir() -> Path:
+    """Locate ``assets/`` without hard-coding a parent depth.
+
+    This originally computed ``parents[3]``, which is correct in the source tree
+    (``backend/app/codec/dictionary.py``) and wrong inside the container, where the
+    package sits at ``/app/app/codec`` and the same arithmetic resolves to ``/``.
+    The daily job therefore ran perfectly all the way to encoding a card and then
+    died on a missing dictionary — a failure that could not appear until the image
+    was actually deployed.
+
+    So: an explicit override first, then a walk upwards looking for the directory,
+    which is the approach ``app.ai.config.repo_root`` already used and the reason
+    that module survived containerisation unchanged.
+    """
+    override = os.environ.get("PIXELSLIME_ASSETS_DIR", "").strip()
+    if override:
+        return Path(override)
+
+    here = Path(__file__).resolve()
+    for candidate in here.parents:
+        assets = candidate / "assets"
+        if (assets / _DICT_FILENAME).is_file():
+            return assets
+    # Nothing found: fall back to the source-tree layout so the error message names
+    # the path a developer would expect rather than the filesystem root.
+    return here.parents[3] / "assets"
 
 
 @cache
@@ -39,7 +65,7 @@ def load_dictionary(version: int = _DICT_VERSION) -> bytes:
         raise DictionaryError(
             f"unsupported dictionary version {version}; only {_DICT_VERSION} exists"
         )
-    path = _ASSETS_DIR / _DICT_FILENAME
+    path = _assets_dir() / _DICT_FILENAME
     try:
         data = path.read_bytes()
     except OSError as exc:

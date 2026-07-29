@@ -13,7 +13,13 @@ param(
     [string] $ContainerImageTag = 'latest',
 
     [Parameter()]
-    [bool] $DeployPlaceholderImage = $true
+    [bool] $DeployPlaceholderImage = $true,
+
+    # Skip the interactive confirmation. Needed for CI and for any non-interactive
+    # shell; the what-if still runs and is still printed, so the change is never
+    # applied unseen.
+    [Parameter()]
+    [switch] $Yes
 )
 
 Set-StrictMode -Version Latest
@@ -88,10 +94,15 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Azure deployment what-if failed.'
 }
 
-$confirmation = Read-Host "Type DEPLOY to apply deployment '$deploymentName'"
-if ($confirmation -cne 'DEPLOY') {
-    Write-Host 'Deployment cancelled; no resources were changed.'
-    exit 0
+if ($Yes) {
+    Write-Host "Applying deployment '$deploymentName' (confirmation skipped by -Yes)."
+}
+else {
+    $confirmation = Read-Host "Type DEPLOY to apply deployment '$deploymentName'"
+    if ($confirmation -cne 'DEPLOY') {
+        Write-Host 'Deployment cancelled; no resources were changed.'
+        exit 0
+    }
 }
 
 az deployment group create `
