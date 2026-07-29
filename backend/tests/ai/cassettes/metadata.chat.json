@@ -1,0 +1,104 @@
+{
+  "choices": [
+    {
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "protected_material_code": {
+          "detected": false,
+          "filtered": false
+        },
+        "protected_material_text": {
+          "detected": false,
+          "filtered": false
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      },
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "annotations": [],
+        "content": "{\"name\":\"Nimbusnooze\",\"level\":14,\"height_mm\":238,\"weight_g\":684,\"strength\":22,\"endurance\":47,\"agility\":31,\"happiness\":78,\"personality\":\"A drowsy stargazer who naps on clouds and trusts its paper crane to navigate.\",\"power_name\":\"Crane Constellation\",\"power_desc\":\"Its paper crane traces sleepy stars that wrap nearby friends in calming light.\",\"quote\":\"Wake me when the stars twinkle.\"}",
+        "refusal": null,
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1785284655,
+  "id": "chatcmpl-E6mNjs69in3j23OjuU3b8OHUM4gOa",
+  "model": "gpt-5.6-sol-2026-07-09",
+  "object": "chat.completion",
+  "prompt_filter_results": [
+    {
+      "prompt_index": 0,
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "indirect_attack": {
+          "detected": false,
+          "filtered": false
+        },
+        "jailbreak": {
+          "detected": false,
+          "filtered": false
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      }
+    }
+  ],
+  "service_tier": "default",
+  "system_fingerprint": null,
+  "usage": {
+    "completion_tokens": 109,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "latency_checkpoint": {
+      "engine_tbt_ms": 15,
+      "engine_ttft_ms": 233,
+      "engine_ttlt_ms": 1848,
+      "pre_inference_ms": 98,
+      "service_tbt_ms": 15,
+      "service_ttft_ms": 366,
+      "service_ttlt_ms": 1977,
+      "total_duration_ms": 1886,
+      "user_visible_ttft_ms": 268
+    },
+    "prompt_tokens": 1103,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    },
+    "total_tokens": 1212
+  }
+}

@@ -46,7 +46,8 @@ Endpoint: `https://fgi.services.ai.azure.com/openai/v1/images/generations`
 | Question | Measured result | Consequence |
 |---|---|---|
 | **API key auth disabled** | An `Authorization: Bearer <Entra token>` from `az account get-access-token --resource https://cognitiveservices.azure.com` works (returns HTTP 400 validation errors, never 401). | ✅ Your constraint is confirmed: **a managed identity is required**, no keys. A `Cognitive Services User` role on account `fgi` is sufficient. |
-| `background` | Accepted values: **`transparent`**, `opaque`, `auto` | ✅ The **transparent background outside the card** you asked for is natively supported. |
+| `background` | Accepted values on **`/generations`**: **`transparent`**, `opaque`, `auto` | ⚠️ **But NOT on `/edits`** — see the row below. |
+| **`background=transparent` on `/images/edits`** | ❌ **`400 — "Transparent background is not supported for this model."`** (`param: background`, `code: invalid_value`). Confirmed live against `gpt-image-2`. `gpt-image-1`, `1-mini` and `1.5` are **not deployed** (404), and `MAI-Image-2.5-Pro` rejects `/edits` outright. | ⚠️ **This was my mistake.** §1.1 originally verified `transparent` on `/generations` and §5.2 assumed it carried over to `/edits`. It does not, and `/edits` is the endpoint we need for the reference image. **Resolution in [§5.3](#53-how-transparency-is-actually-achieved).** |
 | `output_format` | `png` \| `jpeg` | We force `png` (alpha required). |
 | `quality` | `low` \| `medium` \| `high` \| `auto` | We use `high`. |
 | `size` | Width and height must both be **divisible by 16** | The vertical card will be **1024×1536** (same as `mochibo.png`). ✓ 1024/16=64, 1536/16=96 |
@@ -712,7 +713,68 @@ to be random and *"completely different from the reference image"*:
 - Step 4's vision check adds a **similarity guard**: if a card comes back with a pink dome slime in a
   cosy reading room with a cat, it is too close to Mochibo and gets regenerated.
 
-### 5.3 A note on the reference file itself
+### 5.3 How transparency is actually achieved
+
+The plan originally assumed `background=transparent` would work on `/images/edits`. **It does not** —
+W4 found this while building the pipeline, and I confirmed it directly:
+
+```
+POST /openai/v1/images/edits   model=gpt-image-2   background=transparent
+→ 400 {"message":"Transparent background is not supported for this model.",
+       "param":"background","code":"invalid_value"}
+```
+
+The parameter is accepted on `/generations` but rejected on `/edits`, and `/edits` is the endpoint we
+need in order to send the reference card at all. No other image deployment is available: `gpt-image-1`,
+`1-mini` and `1.5` return `404 DeploymentNotFound`, and `MAI-Image-2.5-Pro` refuses `/edits`.
+
+**The fix, and it is a pleasing one.** The prompt instructs the model to render the area outside the
+card as a *flat solid white* exterior. Pillow then recovers real alpha by flood-filling inward from the
+four corners — **the exact technique already used by `scripts/clean_template.py`** to strip the
+checkerboard off the reference card. The tool written to clean the input turns out to be the tool that
+produces the output.
+
+Safeguards, because a flood fill on artwork is not risk-free:
+
+- The fill seeds from **each corner's own colour** and follows only **connected** pixels, so whites
+  *inside* the card (clouds, text, highlights) are protected by the darker frame between them and the
+  edge.
+- A **leak guard** rejects any fill consuming more than 75 % of the canvas.
+- The **authoritative transparency gate is the Pillow corner check**, not the vision model — the vision
+  model's answer depends on how its viewer composites alpha and it disagreed with itself across the two
+  test cards.
+
+Measured on the two real cards generated end to end:
+
+| Card | Mode | Size | Corner alpha | Centre alpha | Transparent |
+|---|---|---|---|---|---|
+| `first-card` (COMMON) | RGBA | 1024×1536 | `[0,0,0,0]` | `255` | **17.0 %** |
+| `legendary` (LEGENDARY) | RGBA | 1024×1536 | `[0,0,0,0]` | `255` | **12.0 %** |
+
+`config.IMAGE_BACKGROUND` is therefore `auto`, not `transparent`.
+
+### 5.4 Evidence that the rarity split works
+
+This is the finding [§5.2](#52-the-reference-strategy-keeping-every-card-the-same-shape) was written to
+test, so it deserves to be recorded rather than assumed:
+
+| | **COMMON — Nimbusnooze** | **LEGENDARY — Thundersnuggle** |
+|---|---|---|
+| Frame | muted **wood** with plain metal corner braces | ornate **gold** celestial, winged crest, crown |
+| Background | none beyond the scene | constellation backdrop, glowing particles overflowing the border |
+| Rarity badge | small grey stone | jewelled diamond |
+| Palette | subdued | luminous |
+
+Both used **the same `mochibo.png` anatomy reference**, and both came back with the identical card
+layout — title bar, type pill, art window, height/weight strip, stats block, quote bubble, ID footer,
+all in the same places. **The anatomy held and the finish varied**, which is exactly the outcome the
+two-part reference strategy was designed for.
+
+Neither card resembled Mochibo's creature or scene: one is a sleeping cosmic cloud on a temple terrace,
+the other a storm cloud on a bed. Similarity scores were 0.48 and 0.59 against a 0.82 rejection
+threshold.
+
+### 5.5 A note on the reference file itself
 
 Worth knowing before we use it:
 
@@ -1225,6 +1287,8 @@ Mochibo (EPIC) is imported as reference card **PS-0001** and is permanently both
 | R9 | The reference template has **no alpha channel** — its "transparency" is a painted checkerboard, which an image model may reproduce as literal art | **Low** *(already fixed)* | Solved: `scripts/clean_template.py` flood-fills the checkerboard into a real alpha channel. **Already run** — `assets/template/mochibo.png` is now RGBA, 17.8 % transparent, corner alpha 0. Original kept as `mochibo-original.png`. |
 | R10 | The site is **public** — scraping, hotlinking, or traffic spikes | Low | Read-only API, in-memory index (asmDB is never hit on the hot path), per-IP rate limiting, cached image proxy, Container Apps max 3 replicas. **Visitors cannot trigger generation**, so traffic can never increase the AI bill. |
 | R11 | $SMILE economy parameters turn out wrong after deployment | Medium | Ship **chain step 1 (anchor only, no token)** first. Genesis Rain is the one irreversible number — everything else sits behind a `PARAMS` role. Testnet-first means a full reset costs nothing. |
+
+| R14 | **`background=transparent` is rejected on `/images/edits`** for `gpt-image-2`, and no other image deployment is usable — but `/edits` is the only endpoint that accepts the reference card | **Resolved** | The prompt renders a flat white exterior and Pillow recovers real alpha by corner flood-fill, reusing `scripts/clean_template.py`'s technique. Guarded by a connected-fill seed and a 75 % leak check. Verified on two real cards: corner alpha 0, centre 255, 17.0 % and 12.0 % transparent. See [§5.3](#53-how-transparency-is-actually-achieved). |
 
 ### Decisions I made (and that you can overrule)
 

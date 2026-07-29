@@ -1,0 +1,84 @@
+PIXEL SLIME — TRADING CARD MASTER PROMPT  (v1)
+
+Generate ONE unique Pixel Slime: an adorable, super fun little creature,
+drawn in rich, detailed PIXEL ART.
+
+── FORMAT ──────────────────────────────────────────────────────────────
+· Present it as a collectible trading card, in the spirit of a Pokémon
+  card or equivalent.
+· The card is VERTICAL (portrait).
+· IMPORTANT: everything OUTSIDE the card's rounded border must be FULLY
+  TRANSPARENT. No backdrop, no outer drop shadow, no checkerboard, no
+  white box — real alpha transparency.
+
+── THE SLIME ───────────────────────────────────────────────────────────
+· The slime's shape is RANDOM and may look completely different from the
+  reference image. The reference defines the CARD STYLE and LAYOUT, not
+  the creature.
+· It may take different silhouettes, wear accessories, and show a
+  different mood.
+· It may be joined by a small animal companion that grants it a boost or
+  a power.
+
+── THE SCENE ───────────────────────────────────────────────────────────
+· The slime is unique and placed in a RANDOM situational environment:
+  out in nature, inside a house, a cosy bedroom, a rainy street, a
+  workshop, a library at dusk — imagine one. Keep it fun.
+
+── THE CARD MUST SHOW (all text in ENGLISH) ────────────────────────────
+    NAME · TYPE · LEVEL · RARITY · HEIGHT · WEIGHT
+    PERSONALITY · POWER (name + description)
+    STRENGTH · ENDURANCE · AGILITY · HAPPINESS
+    a short spoken quote from the slime, and its ID
+
+── RARITY ──────────────────────────────────────────────────────────────
+· A level and a rarity must be generated.
+· The card ANATOMY never changes, whatever the rarity: same portrait
+  proportions, same rounded border, same title bar, same type pill, same
+  rarity badge position, same art window, same stat block, same footer.
+· What changes with rarity is the FINISH only — frame material and
+  ornamentation, richness of the palette, gems, foil, glow, particles.
+  The rarer the card, the more exceptional its colours and its frame.
+     COMMON    plain wooden frame, soft muted palette
+     UNCOMMON  silver frame, a light halo
+     RARE      blue frame, prismatic highlights
+     EPIC      gold and violet frame, a crown gem, sparkle
+     LEGENDARY animated celestial frame, constellation backdrop
+     MYTHIC    rainbow foil, a frame that overflows its own bounds
+
+── NAMING ──────────────────────────────────────────────────────────────
+· Be imaginative with slime names — random, but fun.
+
+
+════════════════════════════════════════════════════════════
+CONCRETE VALUES FOR THIS EXACT CARD — print them verbatim on the card, do not invent or change any number or word:
+  ID:          PS-0002
+  NAME:        Thundersnuggle
+  TYPE:        STORM
+  LEVEL:       88
+  RARITY:      LEGENDARY
+  HEIGHT:      0.27 m
+  WEIGHT:      1.26 kg
+  PERSONALITY: Curious and cozy, it investigates every creak while its Puff Cat naps nearby.
+  POWER:       Blanket Thunder — Summons a warm storm cloud that zaps foes and tucks allies into crackling blankets.
+  STRENGTH:    72
+  ENDURANCE:   84
+  AGILITY:     91
+  HAPPINESS:   96
+  QUOTE:       "Was that thunder under the bed?"
+
+SCENE & CREATURE — random, and it must NOT copy the reference:
+  - Scene / biome: Cozy Bedroom
+  - Mood: Curious
+  - Companion: Sleepy Puff Cat
+  - Accessory: no accessory
+  - Shiny: no
+
+REFERENCE IMAGES — READ CAREFULLY:
+  - The attached reference image(s) define ONLY the CARD STYLE and LAYOUT (proportions, rounded border, title bar, type pill, rarity badge position, art window, height/weight strip, personality+power block, the four stat bars, the quote bubble, the ID footer).
+  - They do NOT define the creature and do NOT define the scene. Invent a NEW, DIFFERENT slime and a NEW scene. Do not reproduce the reference's pink dome slime, its cosy reading room, or its cat.
+
+RARITY FINISH — this card is LEGENDARY. Its finish MUST be: a celestial frame that looks animated, set over a constellation backdrop, with a luminous palette and glowing particles. More exceptional and radiant than epic. This is a HIGHER tier than EPIC, so the card must look visibly MORE exceptional, radiant and richly finished than an EPIC card.
+The card anatomy is identical across rarities; only this finish changes.
+
+RENDERING NOTE — this overrides the transparency line in the brief above: the renderer cannot output alpha, so do NOT leave the outside transparent and do NOT paint scenery, a gradient, a drop shadow or a checkerboard there. Instead fill the entire area OUTSIDE the rounded card border with a single FLAT, SOLID, UNIFORM WHITE — the pipeline keys that white to real transparency afterwards. Keep a small, even white margin around the whole card.

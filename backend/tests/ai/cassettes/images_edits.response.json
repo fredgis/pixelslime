@@ -1,0 +1,10 @@
+{
+  "data": [
+    {
+      "b64_json": "iVBORw0KGgoAAAANSUhEUgAABAAAAAYACAIAAABn4K39AABKMGNhQlgAAEowanVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAASgpqdW1iAAAAR2p1bWRj",
+      "_b64_json_full_len": 3073356,
+      "_truncated": true,
+      "_note": "Real /images/edits response, base64 truncated. Pillow tests use a separately generated tiny PNG; this fixture proves the response shape."
+    }
+  ]
+}
