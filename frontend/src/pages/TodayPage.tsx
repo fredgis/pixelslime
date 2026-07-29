@@ -157,7 +157,7 @@ function PreviousSlime(): ReactElement | null {
         </div>
 
         {stats.length > 0 ? (
-          <div className="grid w-full grid-cols-2 gap-2">
+          <div className="flex w-full flex-col gap-2">
             {stats.map(([stat, value], i) => (
               <StatBar key={stat} stat={stat} value={value} index={i} />
             ))}
