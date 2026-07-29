@@ -14,8 +14,18 @@ def test_today_returns_card_and_countdown(make_client: ClientFactory) -> None:
     assert set(body) == {"card", "nextBloomAt", "secondsUntilNext", "dayNumber"}
     assert body["card"]["serial"] == 1
     assert body["dayNumber"] == 1
+    assert body["dayNumber"] == body["card"]["dayNumber"]  # contract: a mirror of card.dayNumber
     assert body["secondsUntilNext"] >= 0
     assert body["nextBloomAt"].endswith("Z")
+
+
+def test_today_day_number_mirrors_card_not_index_size(make_client: ClientFactory) -> None:
+    # A lone card whose serial differs from the collection size proves the top-level
+    # dayNumber tracks card.dayNumber, not index.size (W10's D3).
+    client, _source, _blob = make_client(cards=[card_minted_today(serial=42)])
+    body = client.get("/api/cards/today").json()
+    assert body["card"]["dayNumber"] == 42
+    assert body["dayNumber"] == 42
 
 
 def test_today_404_when_nothing_bloomed_today(make_client: ClientFactory) -> None:
@@ -118,10 +128,15 @@ def test_single_card_has_full_shape(client: TestClient) -> None:
         "mintDate",
         "imageUrl",
         "thumbUrl",
+        "dayNumber",
+        "onChain",
+        "chain",
     ):
         assert field in body, field
     assert body["cardId"] == "PS-0001"
     assert body["imageUrl"] == "/api/cards/1/image"
+    assert body["onChain"] is False  # mochibo carries no anchor row
+    assert body["chain"] is None
 
 
 def test_unknown_serial_is_404_error_shape(client: TestClient) -> None:
@@ -147,10 +162,21 @@ def test_summary_shape_on_listing(make_client: ClientFactory) -> None:
     }
 
 
-def test_invalid_query_and_path_params_are_422(client: TestClient) -> None:
+def test_invalid_query_params_are_422(client: TestClient) -> None:
     assert client.get("/api/cards", params={"size": 101}).status_code == 422
     assert client.get("/api/cards", params={"sort": "loudest"}).status_code == 422
     assert client.get("/api/cards", params={"type": "NOPE"}).status_code == 422
-    assert client.get("/api/cards/0").status_code == 422
-    assert client.get("/api/cards/70000").status_code == 422
-    assert client.get("/api/cards/notanumber").status_code == 422
+
+
+def test_invalid_serial_paths_are_404(client: TestClient) -> None:
+    # To a visitor, /slime/abc or an out-of-range serial is simply a card that does
+    # not exist: a clean 404 matching the contract and W6's mock, not FastAPI's 422
+    # leaking a path-validation internal (W10's V4). Covers every serial route.
+    bad = ("0", "70000", "notanumber")
+    for serial in bad:
+        for suffix in ("", "/raw", "/image", "/thumb"):
+            response = client.get(f"/api/cards/{serial}{suffix}")
+            assert response.status_code == 404, f"/api/cards/{serial}{suffix}"
+        nft = client.get(f"/api/nft/{serial}")
+        assert nft.status_code == 404, f"/api/nft/{serial}"
+    assert client.get("/api/cards/abc").json()["error"]["code"] == "card_not_found"

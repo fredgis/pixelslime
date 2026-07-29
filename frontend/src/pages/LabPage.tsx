@@ -3,7 +3,7 @@
  *
  * Explains the lore, the six rarity houses with their real odds/yields/adoption prices
  * (all from the design tokens — never invented), the sixteen types, and how a card is
- * born (the daily pipeline that ends as 175 bytes anchored on-chain). Little slimes
+ * born (the daily pipeline that ends as 175-byte asmDB rows anchored on-chain). Little slimes
  * demonstrate throughout.
  */
 import type { ReactElement } from 'react';
@@ -23,7 +23,7 @@ const TOTAL_BLOOMS = 3_650;
 const BIRTH_STEPS: ReadonlyArray<{ title: string; body: string; color: string }> = [
   { title: 'SEED', body: 'A daily seed rolls the slime: rarity, type, stats, biome and a companion.', color: tokens.color.bubblegum },
   { title: 'PAINT', body: 'A pixel-art portrait is generated and vision-checked until it matches the card.', color: tokens.color.sky },
-  { title: 'PACK', body: 'Every field is packed into a PSC-1 stream and Z85-encoded — about 175 bytes.', color: tokens.color.mint },
+  { title: 'PACK', body: 'Every field is packed into a PSC-1 stream and Z85-encoded into 175-byte asmDB rows.', color: tokens.color.mint },
   { title: 'ANCHOR', body: 'keccak-256 hashes the stream; that hash is minted on Polygon Amoy.', color: tokens.color.sunbeam },
   { title: 'BLOOM', body: 'At 10:00 Paris the card blooms into the SLIMEDEX for everyone to meet.', color: tokens.color.grape },
 ];
@@ -103,13 +103,13 @@ export function LabPage(): ReactElement {
 
       <section className="rounded-xl border-4 border-ink bg-paper p-6 text-center shadow-card">
         <div className="mb-3 flex justify-center gap-2">
-          <Chip tone={tokens.color.mint} icon="✦">175 bytes</Chip>
+          <Chip tone={tokens.color.mint} icon="✦">175 bytes / row</Chip>
           <Chip tone={tokens.color.sky} icon="⛓">on-chain forever</Chip>
           <Chip tone={tokens.color.bubblegum} icon="☀">one a day</Chip>
         </div>
         <p className="mx-auto max-w-xl font-round text-ink">
           3,650 slimes will bloom over exactly ten years — then the rain stops, and the paradise is
-          complete. Every one is a treasure you can hold in 175 bytes.
+          complete. Every one is a treasure you can hold in a handful of bytes.
         </p>
       </section>
     </div>

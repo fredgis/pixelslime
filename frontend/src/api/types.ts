@@ -13,11 +13,27 @@ export type Rarity = components['schemas']['Rarity'];
 export type SlimeType = components['schemas']['SlimeType'];
 export type ApiError = components['schemas']['Error'];
 export type CardSummary = components['schemas']['CardSummary'];
-export type Card = components['schemas']['Card'];
+
+type GeneratedCard = components['schemas']['Card'];
+
+/**
+ * CONTRACT DEFECT (reported to W7): `contracts/openapi.yaml` declares `Card.chain` as
+ * `type: object` (non-nullable), which contradicts its own prose — "Always present as a
+ * key; `null` when the card has not been anchored yet … a client can rely on
+ * `card.chain === null`" — and the real backend, which emits `chain: null` for unanchored
+ * cards. The OpenAPI 3.1 nullable fix that covered biome/mood/companion missed `chain`, so
+ * `openapi-typescript` now generates it as non-nullable. Until the contract is corrected,
+ * restore the documented nullability here so the mock can honestly emit `chain: null` and
+ * so the badge logic narrows correctly. `TodayResponse.card` and `RawResponse.decoded`
+ * embed the same card, so they are re-threaded through this type below.
+ */
+export type Card = Omit<GeneratedCard, 'chain'> & { chain: GeneratedCard['chain'] | null };
 
 /** Response of `GET /api/cards/today`. */
-export type TodayResponse =
-  paths['/api/cards/today']['get']['responses']['200']['content']['application/json'];
+export type TodayResponse = Omit<
+  paths['/api/cards/today']['get']['responses']['200']['content']['application/json'],
+  'card'
+> & { card: Card };
 
 /** Response of `GET /api/cards` (a page of summaries). */
 export type CardsPage =
@@ -29,8 +45,10 @@ export type CardsQuery = NonNullable<paths['/api/cards']['get']['parameters']['q
 export type CardsSort = NonNullable<CardsQuery['sort']>;
 
 /** Response of `GET /api/cards/{serial}/raw` — the provenance view. */
-export type RawResponse =
-  paths['/api/cards/{serial}/raw']['get']['responses']['200']['content']['application/json'];
+export type RawResponse = Omit<
+  paths['/api/cards/{serial}/raw']['get']['responses']['200']['content']['application/json'],
+  'decoded'
+> & { decoded: Card };
 
 /** One verbatim asmDB row inside {@link RawResponse}. */
 export type RawRow = RawResponse['rows'][number];

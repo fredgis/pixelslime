@@ -20,7 +20,10 @@ from typing import Protocol, runtime_checkable
 
 from app.asmdb import AsmDbClient, AsmDbNotFound, AsmDbRepository, AsmDbStarting
 from app.asmdb import Row as AsmDbRow
+from app.chain import AnchorResult, build_anchor_row_from_result
 from app.codec import Card, Row, decode, encode
+
+from .chain import ANCHOR_ROW_PART, ChainAnchor, decode_anchor_content
 
 _MAX_CONTENT_BYTES = 175
 _FORBIDDEN_BYTES = (0x00, 0x0D, 0x0A)
@@ -52,6 +55,14 @@ class CardSource(Protocol):
 
     async def read_card(self, serial: int) -> Card:
         """Read and decode one card. Raise :class:`AsmDbNotFound` if absent."""
+        ...
+
+    async def read_chain(self, serial: int) -> ChainAnchor | None:
+        """Read and decode the card's on-chain anchor row (part 8).
+
+        Returns ``None`` when the card carries no decodable anchor row — that
+        absence, not ``flags.on_chain``, is what "not anchored" means (D2).
+        """
         ...
 
     async def card_for_date(self, yyyymmdd_value: int) -> Card | None:
@@ -91,6 +102,19 @@ class AsmDbCardSource:
         rows = await self._repo.read_card_rows(serial)
         return decode(_to_codec_rows(rows))
 
+    async def read_chain(self, serial: int) -> ChainAnchor | None:
+        """Fetch the ``part = 8`` anchor row directly and decode it, if present.
+
+        This is an off-hot-path read (index build / reconcile only), so touching
+        asmDB here is allowed; the anchor row is deliberately outside the header
+        range scan and so must be fetched by its deterministic id.
+        """
+        try:
+            row = await self._client.get(serial * 16 + ANCHOR_ROW_PART)
+        except AsmDbNotFound:
+            return None
+        return decode_anchor_content(row.content, serial=serial)
+
     async def card_for_date(self, yyyymmdd_value: int) -> Card | None:
         try:
             header = await self._repo.find_card_by_date(yyyymmdd_value)
@@ -123,6 +147,7 @@ class InMemoryCardSource:
 
     def __init__(self, *, engine: str = "asmdb-fake/1.0", awake: bool = True) -> None:
         self._rows: dict[int, list[Row]] = {}
+        self._anchor_rows: dict[int, Row] = {}
         self._engine = engine
         #: Flip to ``False`` to simulate a scaled-to-zero instance for tests.
         self.awake = awake
@@ -133,6 +158,16 @@ class InMemoryCardSource:
         for row in rows:
             _guard_row_content(row.content)
         self._rows[card.serial] = rows
+
+    def add_anchor(self, result: AnchorResult) -> None:
+        """Store a ``part = 8`` anchor row, built through the real W9 encoder.
+
+        Using :func:`app.chain.build_anchor_row_from_result` means a test round-trips
+        the genuine encode → decode pair, so a green anchor test proves the two agree.
+        """
+        row = build_anchor_row_from_result(result)
+        _guard_row_content(row.content)
+        self._anchor_rows[result.serial] = row
 
     def add_partial_card(self, card: Card, *, keep_rows: int) -> list[Row]:
         """Store only the first ``keep_rows`` rows of a multi-row card.
@@ -149,6 +184,7 @@ class InMemoryCardSource:
 
     def remove(self, serial: int) -> None:
         self._rows.pop(serial, None)
+        self._anchor_rows.pop(serial, None)
 
     async def health(self) -> SourceHealth:
         if not self.awake:
@@ -165,6 +201,12 @@ class InMemoryCardSource:
         if rows is None:
             raise AsmDbNotFound(f"no card with serial {serial}", code="not_found", status_code=404)
         return decode(rows)
+
+    async def read_chain(self, serial: int) -> ChainAnchor | None:
+        row = self._anchor_rows.get(serial)
+        if row is None:
+            return None
+        return decode_anchor_content(row.content, serial=serial)
 
     async def card_for_date(self, yyyymmdd_value: int) -> Card | None:
         for rows in self._rows.values():

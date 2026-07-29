@@ -23,6 +23,7 @@ from typing import Any
 from app.codec import Card, card_hash, encode, encode_stream
 
 from . import contracts
+from .chain import ChainAnchor
 from .time import mint_date
 
 
@@ -45,8 +46,14 @@ def _mint_date_iso(card: Card) -> str:
     return mint_date(card.mint_day).isoformat()
 
 
-def card_summary(card: Card) -> dict[str, Any]:
-    """Project a card onto ``CardSummary`` — what the gallery grid needs, no more."""
+def card_summary(card: Card, *, chain: ChainAnchor | None = None) -> dict[str, Any]:
+    """Project a card onto ``CardSummary`` — what the gallery grid needs, no more.
+
+    ``onChain`` mirrors ``chain != null`` — i.e. whether a decodable anchor row
+    exists — so the grid badge and the detail view can never disagree (D2). It is
+    *not* read from ``flags.on_chain``, which a mid-anchor crash can leave set with
+    no row.
+    """
     return {
         "serial": card.serial,
         "cardId": card_id(card.serial),
@@ -57,18 +64,20 @@ def card_summary(card: Card) -> dict[str, Any]:
         "shiny": card.shiny,
         "mintDate": _mint_date_iso(card),
         "thumbUrl": thumb_url(card.serial),
-        "onChain": card.flags.on_chain,
+        "onChain": chain is not None,
     }
 
 
-def card_detail(card: Card, *, day_number: int | None = None) -> dict[str, Any]:
+def card_detail(
+    card: Card, *, day_number: int | None = None, chain: ChainAnchor | None = None
+) -> dict[str, Any]:
     """Project a card onto the full ``Card`` schema plus derived display fields.
 
     ``dayNumber`` defaults to the serial: a card is the *n*-th slime to bloom and
     the serial is exactly that sequence number (``contracts/card.schema.json``).
-    ``chain`` is ``null`` until the on-chain anchor (PSC-1 part 8) is decodable —
-    see the W7 report — but ``on-chain`` status is still surfaced via the header
-    flag.
+    ``chain`` is populated from the decoded ``part = 8`` anchor row when one exists,
+    and ``null`` otherwise; ``onChain`` is the boolean mirror of it (D1/D2). Both are
+    driven by the anchor row — the evidence — never by ``flags.on_chain`` alone.
     """
     payload: dict[str, Any] = {
         "serial": card.serial,
@@ -92,7 +101,8 @@ def card_detail(card: Card, *, day_number: int | None = None) -> dict[str, Any]:
         "dayNumber": card.serial if day_number is None else day_number,
         "imageUrl": image_url(card.serial),
         "thumbUrl": thumb_url(card.serial),
-        "chain": None,
+        "chain": chain.to_api_dict() if chain is not None else None,
+        "onChain": chain is not None,
     }
     house = contracts.rarity_houses().get(card.rarity)
     if house is not None:
@@ -108,13 +118,15 @@ def card_detail(card: Card, *, day_number: int | None = None) -> dict[str, Any]:
     return payload
 
 
-def raw_view(card: Card) -> dict[str, Any]:
+def raw_view(card: Card, *, chain: ChainAnchor | None = None) -> dict[str, Any]:
     """Build the provenance view: the asmDB rows verbatim plus their decoding.
 
     Integers are rendered as strings exactly as asmDB returns them (a u64 does not
     survive a JS ``number``), the keccak256 ``cardHash`` is ``0x``-prefixed, and
     the decoded card is included so the "see the 175 bytes" panel can show the
-    payload next to what it means.
+    payload next to what it means. ``chain`` is threaded into the decoded card so
+    its ``onChain``/``chain`` match the detail route (the anchor row is part 8, not
+    part of the 175-byte header stream shown here).
     """
     rows = encode(card)
     stream = encode_stream(card)
@@ -126,7 +138,7 @@ def raw_view(card: Card) -> dict[str, Any]:
         "streamBytes": len(stream),
         "rowCount": len(rows),
         "cardHash": "0x" + card_hash(card).hex(),
-        "decoded": card_detail(card),
+        "decoded": card_detail(card, chain=chain),
     }
 
 

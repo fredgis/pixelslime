@@ -23,6 +23,7 @@ for _p in (str(_BACKEND), str(_TESTDIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from app.chain import AnchorResult  # noqa: E402
 from app.codec import Card  # noqa: E402
 from app.core.time import MINT_EPOCH, paris_today  # noqa: E402
 
@@ -60,8 +61,14 @@ def build_card(
     rarity: str = "EPIC",
     happiness: int = 95,
     shiny: bool = False,
+    on_chain: bool = False,
 ) -> Card:
-    """Build a valid card from the mochibo template with the given overrides."""
+    """Build a valid card from the mochibo template with the given overrides.
+
+    ``on_chain`` sets only the header ``flags.on_chain`` bit — deliberately *without*
+    writing an anchor row — so a test can prove the API trusts the anchor row, not the
+    flag (the D2 "flag set, no row" case).
+    """
     data = dict(_MOCHIBO_DUMP)
     data.update(
         serial=serial,
@@ -72,7 +79,29 @@ def build_card(
         happiness=happiness,
         shiny=shiny,
     )
+    if on_chain:
+        flags = dict(data["flags"])
+        flags["on_chain"] = True
+        data["flags"] = flags
     return Card.model_validate(data)
+
+
+def anchor_for(
+    serial: int,
+    *,
+    token_id: int | None = None,
+    block_number: int | None = None,
+    tx_byte: int = 0xAB,
+    hash_byte: int = 0xCD,
+) -> AnchorResult:
+    """Build an :class:`AnchorResult` for a serial with deterministic tx/card hashes."""
+    return AnchorResult(
+        serial=serial,
+        tx_hash=bytes([tx_byte]) * 32,
+        block_number=block_number if block_number is not None else 10_000 + serial,
+        token_id=token_id if token_id is not None else serial,
+        card_hash=bytes([hash_byte]) * 32,
+    )
 
 
 def card_minted_today(serial: int = 1, **overrides: object) -> Card:

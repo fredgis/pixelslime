@@ -125,24 +125,41 @@ def check_openapi() -> None:
 
 
 def check_prose_matches_required(spec: dict) -> None:
-    """A description that promises a field is always present must be backed by `required`.
+    """A description that promises something must be backed by the schema itself.
 
-    This is the exact hole W10 found: `Card.onChain` was documented as "Always present",
-    the `required` list omitted it, so `openapi-typescript` generated `onChain?: boolean`.
-    The frontend honoured the prose and the backend did not, and because the schema was
-    looser than the sentence, nothing caught the disagreement. Prose is not binding —
-    only the schema is — so anywhere the two can drift, they must be reconciled here.
+    Two checks, both of which caught real bugs:
+
+    * "always present" must be in `required`. This is the exact hole W10 found:
+      `Card.onChain` was documented as always present, `required` omitted it, so
+      `openapi-typescript` generated `onChain?: boolean`. The frontend honoured the
+      prose and the backend honoured the schema, and because the schema was looser
+      than the sentence, nothing caught the disagreement.
+    * "`null` when ..." must be an actually nullable type. I introduced this one while
+      fixing the first: a regex stripped a standalone `nullable: true` from `chain`
+      without replacing it, leaving a non-nullable object whose own description said it
+      was null when unanchored.
+
+    Prose is not binding. Only the schema is. Anywhere the two can drift, reconcile here.
     """
     for name, schema in spec.get("components", {}).get("schemas", {}).items():
         required = set(schema.get("required") or [])
         for field, definition in (schema.get("properties") or {}).items():
             description = str(definition.get("description", ""))
-            promises = re.search(r"always present", description, re.I)
-            if promises and field not in required:
+
+            if re.search(r"always present", description, re.I) and field not in required:
                 fail(
                     f"{name}.{field} is documented as always present but is missing from "
                     f"`required` — the schema is looser than its own description"
                 )
+
+            if re.search(r"`?null`? when", description, re.I):
+                declared = definition.get("type")
+                types = declared if isinstance(declared, list) else [declared]
+                if "null" not in types:
+                    fail(
+                        f"{name}.{field} is documented as null in some cases but its type "
+                        f"is {declared!r} — use `type: [{types[0]}, \"null\"]`"
+                    )
 
 
 def check_tokens() -> None:

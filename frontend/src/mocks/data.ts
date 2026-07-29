@@ -14,7 +14,7 @@
 import type { Card, CardSummary, Rarity, SlimeType } from '@/api/types';
 import type { RawResponse } from '@/api/types';
 import { tokens } from '@/design';
-import { keccak256, z85Encode, chunk } from './psc';
+import { keccak256, z85Encode } from './psc';
 import { mockCardSvg, svgDataUri, pseudoArtId, type MockAccessory, type MockFace } from './sprite';
 
 /**
@@ -308,50 +308,79 @@ export const SUMMARIES: readonly CardSummary[] = CARDS.map(toSummary);
 
 /* ───────────────────────── provenance ───────────────────────── */
 
-/** The PIXELSLIME on-chain record is a fixed-width 175-byte PSC-1 payload. */
-const RECORD_BYTES = 175;
+/**
+ * asmDB stores at most 175 bytes of Z85 text per row, which is floor(175 / 5) × 4 = 140
+ * binary stream bytes. A PSC-1 card is a short run of such rows (≤ 4 rows / 560 bytes).
+ * 175 is the capacity of ONE row — never the size of a card.
+ */
+const ROW_CAPACITY_BYTES = 140;
 
-/** The deterministic PSC-1 field data for a card, before fixed-width framing. */
-function streamFor(card: Card): Uint8Array {
-  const parts = [
-    `PSC1|${card.cardId}|${card.name}|${card.rarity}.${tokens.rarity[card.rarity].house}|${card.type}|L${card.level}`,
-    `DIM:${card.height_mm}mm/${card.weight_g}g`,
-    `STAT:${card.strength}.${card.endurance}.${card.agility}.${card.happiness}`,
-    `BORN:${card.mintDate}#${card.dayNumber ?? card.serial}`,
-    `HAB:${card.biome ?? '?'}~${card.mood ?? '?'}~${card.companion ?? 'solo'}`,
-    `PWR:${card.power_name}`,
-    `ART:${pseudoArtId(card.serial)}`,
-    `SAY:${card.quote}`,
-  ];
-  return new TextEncoder().encode(parts.join('|'));
+/**
+ * Real PSC-1 streams are VARIABLE length. These are the measured sizes of the reference
+ * cards (docs/CODEC.md §5, confirmed by W10 against the real backend): Mochibo packs into
+ * a 52-byte single row; the LEGENDARY Thundersnuggle needs 183 bytes across two. Every
+ * other serial derives a realistic length from its own copy, so the mock never pretends
+ * every card is the same size (the bug W10 caught: it used to pad every card to 175).
+ */
+const STREAM_BYTES_BY_SERIAL: Readonly<Record<number, number>> = { 13: 52, 14: 183 };
+
+/** A card's PSC-1 stream length: the measured reference value, or a realistic derivation. */
+function streamBytesFor(card: Card): number {
+  const measured = STREAM_BYTES_BY_SERIAL[card.serial];
+  if (measured !== undefined) return measured;
+  const body = [card.name, card.personality, card.power_name, card.power_desc, card.quote].join(
+    '\u001f',
+  );
+  const bodyBytes = new TextEncoder().encode(body).length;
+  // 32-byte binary header + dictionary-compressed body (the real codec saves ~45%).
+  const total = 32 + Math.round(bodyBytes * 0.55);
+  return Math.max(44, Math.min(total, ROW_CAPACITY_BYTES * 4));
 }
 
 /**
- * Frame the field data into exactly {@link RECORD_BYTES}: every card mints to the same
- * 175-byte record ("175 bytes of pure joy"), so we truncate longer streams and pad
- * shorter ones with a deterministic printable filler. The bytes are opaque once Z85'd.
+ * A card's deterministic PSC-1 byte stream at its real (variable) length. The bytes are
+ * seeded from the card's own fields, so they are stable and unique per card, and look
+ * like the compressed binary the real codec emits once Z85-encoded — no decodable
+ * structure, exactly like the real payload.
  */
-function frameRecord(bytes: Uint8Array): Uint8Array {
-  const out = new Uint8Array(RECORD_BYTES);
-  out.set(bytes.subarray(0, RECORD_BYTES));
-  for (let i = bytes.length; i < RECORD_BYTES; i += 1) {
-    out[i] = 0x21 + ((i * 7) % 90);
+function streamFor(card: Card): Uint8Array {
+  const total = streamBytesFor(card);
+  const seed =
+    `PSC1|${card.cardId}|${card.name}|${card.rarity}|${card.type}|L${card.level}|` +
+    `${card.strength}.${card.endurance}.${card.agility}.${card.happiness}|` +
+    `${card.biome ?? '?'}~${card.mood ?? '?'}~${card.companion ?? 'solo'}|` +
+    `${card.power_name}|${card.quote}|${pseudoArtId(card.serial)}`;
+  const out = new Uint8Array(total);
+  // A tiny deterministic PRNG (FNV-seeded LCG) — stable per card, but noise-like.
+  let state = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(seed)) state = Math.imul(state ^ b, 0x01000193) >>> 0;
+  for (let i = 0; i < total; i += 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    out[i] = (state >>> 24) & 0xff;
   }
   return out;
 }
 
-/** Build the raw provenance view (genuine Z85 rows + keccak-256 anchor). */
+/**
+ * Build the raw provenance view — genuine Z85 rows, the real variable stream length, and a
+ * real keccak-256 anchor. Row values follow docs/CODEC.md §4.2: part 0 carries the mint
+ * date as YYYYMMDD (positive — the only filterable key), and every continuation row carries
+ * -(serial × 16 + part) (negative), so a RANGE query for a day's header row can never pull
+ * a continuation row. The header value is what makes the daily-card lookup work.
+ */
 export function buildRaw(card: Card): RawResponse {
-  const stream = frameRecord(streamFor(card));
-  const z85 = z85Encode(stream);
-  const pieces = chunk(z85, 175);
-  const value = card.mintDate.replace(/-/g, '');
-  const rows = pieces.map((content, i) => ({
-    id: String(card.serial * 16 + i),
-    value,
-    tag: `psc.${card.serial}.${i}`,
-    content,
-  }));
+  const stream = streamFor(card);
+  const dateKey = card.mintDate.replace(/-/g, '');
+  const partCount = Math.max(1, Math.ceil(stream.length / ROW_CAPACITY_BYTES));
+  const rows = Array.from({ length: partCount }, (_unused, part) => {
+    const piece = stream.subarray(part * ROW_CAPACITY_BYTES, (part + 1) * ROW_CAPACITY_BYTES);
+    return {
+      id: String(card.serial * 16 + part),
+      value: part === 0 ? dateKey : String(-(card.serial * 16 + part)),
+      tag: `psc.${card.serial}.${part}`,
+      content: z85Encode(piece),
+    };
+  });
   return {
     rows,
     streamBytes: stream.length,

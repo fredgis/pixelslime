@@ -3,8 +3,8 @@
  *
  * The card at full size with the pointer/gyroscope holo tilt, a cascade of stat bars,
  * the full lore (biome, companion, birth date, serial), the on-chain badge when present,
- * and the "see the 175 bytes" provenance panel driven by `/api/cards/{serial}/raw` — the
- * genuine Z85 rows, their count, the stream length and the keccak-256 cardHash. Opening a
+ * and the provenance panel driven by `/api/cards/{serial}/raw` — the genuine Z85 rows, their
+ * count, the real (variable-length) stream size and the keccak-256 cardHash. Opening a
  * profile discovers the card (localStorage) and tints the page to its palette.
  */
 import { useEffect, useState, type ReactElement } from 'react';
@@ -24,12 +24,13 @@ import { useAmbientStore } from '@/store/ambient';
 import { useDiscoveryStore } from '@/store/discovery';
 import { SmartImage } from '@/components/SmartImage';
 import { ErrorState, LoadingState } from '@/components/States';
+import NotFoundPage from '@/pages/NotFoundPage';
 import { toast } from '@/store/toast';
 
 export function ProfilePage(): ReactElement {
   const { serial: serialParam } = useParams();
   const serial = Number(serialParam);
-  const valid = Number.isInteger(serial) && serial > 0;
+  const valid = Number.isInteger(serial) && serial >= 1 && serial <= 65_535;
   const card = useCard(valid ? serial : undefined);
   const setTint = useAmbientStore((s) => s.setTint);
   const discover = useDiscoveryStore((s) => s.discover);
@@ -45,10 +46,14 @@ export function ProfilePage(): ReactElement {
     return () => setTint(null);
   }, [data, discover, setTint]);
 
-  if (!valid) return <ErrorState label="That serial doesn’t look right." />;
+  // A bad serial (`/slime/abc`, out of range) or a genuinely absent card (404/422) is a
+  // "not found", not a failure — show the friendly not-found screen, not the error state.
+  if (!valid) return <NotFoundPage />;
   if (card.isLoading) return <LoadingState label="Fetching the slime…" />;
   if (card.isError || !data) {
-    return <ErrorState label="No slime with that serial." onRetry={() => void card.refetch()} />;
+    const status = card.error?.status;
+    if (status === 404 || status === 422) return <NotFoundPage />;
+    return <ErrorState label="Couldn’t load this slime." onRetry={() => void card.refetch()} />;
   }
 
   const stats: ReadonlyArray<[StatKey, number]> = [
@@ -174,7 +179,7 @@ function ProvenancePanel({ serial, open, onToggle }: ProvenancePanelProps): Reac
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="provenance-heading" className="font-pixel text-[14px]" style={{ color: tokens.color.sunbeam }}>
-            ✦ THE 175 BYTES
+            ✦ THE STORED BYTES
           </h2>
           <p className="mt-1 font-stat text-[11px] tracking-[1px]" style={{ color: tokens.color.mint }}>
             The exact PSC-1 payload this card lives as, in asmDB.
@@ -202,15 +207,27 @@ function ProvenancePanel({ serial, open, onToggle }: ProvenancePanelProps): Reac
           </p>
         ) : (
           <div className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-wrap gap-4 font-stat text-[12px]" style={{ color: tokens.color.cream }}>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 font-stat text-[12px]" style={{ color: tokens.color.cream }}>
               <span>
-                <b style={{ color: tokens.color.sunbeam }}>{raw.data.streamBytes}</b> bytes
+                <b style={{ color: tokens.color.sunbeam }}>{raw.data.streamBytes}</b> BYTES
               </span>
+              <span aria-hidden style={{ color: tokens.color.grape }}>·</span>
               <span>
-                <b style={{ color: tokens.color.sunbeam }}>{raw.data.rowCount}</b> asmDB rows
+                <b style={{ color: tokens.color.sunbeam }}>{raw.data.rowCount}</b>{' '}
+                ASMDB ROW{raw.data.rowCount === 1 ? '' : 'S'}
               </span>
+              <span aria-hidden style={{ color: tokens.color.grape }}>·</span>
+              <span>175 BYTES / ROW</span>
+              <span aria-hidden style={{ color: tokens.color.grape }}>·</span>
               <span>Z85 · keccak-256 anchored</span>
             </div>
+
+            <p className="font-stat text-[11px] leading-relaxed" style={{ color: tokens.color.mint }}>
+              Every row is one verbatim asmDB record. <b style={{ color: tokens.color.sky }}>id</b> is
+              its address (serial×16 + part); <b style={{ color: tokens.color.sky }}>val</b> is the
+              mint-date key on the header row and the negative row address on continuations; and{' '}
+              <b style={{ color: tokens.color.sky }}>content</b> is the real Z85 payload.
+            </p>
 
             <button
               type="button"
@@ -246,7 +263,8 @@ function ProvenancePanel({ serial, open, onToggle }: ProvenancePanelProps): Reac
         )
       ) : (
         <p className="mt-4 font-stat text-[12px]" style={{ color: tokens.color.mint }}>
-          175 bytes, encoded in Z85, anchored on-chain by keccak-256. Unseal to inspect the real rows.
+          A variable-length PSC-1 stream, packed into 175-byte asmDB rows, encoded in Z85 and
+          anchored on-chain by keccak-256. Unseal to inspect the real rows.
         </p>
       )}
     </section>

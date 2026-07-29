@@ -34,6 +34,12 @@ def error_body(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
+def _is_serial_path_error(err: dict[str, Any]) -> bool:
+    """True when a validation error is about the ``{serial}`` path parameter."""
+    loc = err.get("loc", ())
+    return len(loc) >= 2 and loc[0] == "path" and loc[1] == "serial"
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """Register the handlers that render errors as the contract envelope."""
 
@@ -43,7 +49,17 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(_request: Request, exc: RequestValidationError) -> JSONResponse:
-        first = exc.errors()[0] if exc.errors() else {"msg": "invalid request"}
+        errors = exc.errors()
+        if any(_is_serial_path_error(err) for err in errors):
+            # A non-numeric or out-of-range serial is, to a visitor, just a card that
+            # does not exist. Return the contract's clean 404 (matching W6's mock)
+            # instead of FastAPI's 422, which would leak a path-validation internal
+            # for e.g. /api/cards/abc or /api/cards/99999 (W10's V4).
+            return JSONResponse(
+                status_code=404,
+                content=error_body("card_not_found", "No card with that serial"),
+            )
+        first = errors[0] if errors else {"msg": "invalid request"}
         location = ".".join(str(part) for part in first.get("loc", ()) if part != "query")
         message = first.get("msg", "invalid request")
         detail = f"{location}: {message}" if location else message

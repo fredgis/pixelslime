@@ -38,11 +38,12 @@ async def get_today(index: IndexDep) -> dict[str, Any]:
     card = index.today()
     if card is None:
         raise ApiError(404, "no_card_today", "No card has bloomed today yet")
+    detail = card_detail(card, chain=index.chain_for(card.serial))
     return {
-        "card": card_detail(card),
+        "card": detail,
         "nextBloomAt": iso_utc(next_bloom_at()),
         "secondsUntilNext": seconds_until_next_bloom(),
-        "dayNumber": index.size,
+        "dayNumber": detail["dayNumber"],
     }
 
 
@@ -59,7 +60,7 @@ async def list_cards(
     """Return a filtered, sorted, paginated page of card summaries."""
     result = index.query(page=page, size=size, type_=type_, rarity=rarity, sort=sort, q=q)
     return {
-        "items": [card_summary(card) for card in result.items],
+        "items": [card_summary(card, chain=index.chain_for(card.serial)) for card in result.items],
         "page": result.page,
         "size": result.size,
         "total": result.total,
@@ -73,7 +74,7 @@ async def get_card(index: IndexDep, serial: SerialPath) -> dict[str, Any]:
     card = index.get(serial)
     if card is None:
         raise ApiError(404, "card_not_found", f"No card with serial {serial}")
-    return card_detail(card)
+    return card_detail(card, chain=index.chain_for(serial))
 
 
 @router.get("/cards/{serial}/raw")
@@ -82,4 +83,4 @@ async def get_card_raw(index: IndexDep, serial: SerialPath) -> dict[str, Any]:
     card = index.get(serial)
     if card is None:
         raise ApiError(404, "card_not_found", f"No card with serial {serial}")
-    return raw_view(card)
+    return raw_view(card, chain=index.chain_for(serial))

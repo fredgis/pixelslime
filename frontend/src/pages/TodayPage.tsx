@@ -155,7 +155,7 @@ export function TodayPage(): ReactElement {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <PixelButton variant="sunbeam" onClick={() => navigate(`/slime/${card.serial}`)}>
-              See the 175 bytes →
+              See the stored bytes →
             </PixelButton>
             <Link to="/dex" className="ps-focusable">
               <PixelButton variant="ghost">Browse the SLIMEDEX</PixelButton>

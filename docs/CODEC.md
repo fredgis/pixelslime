@@ -258,14 +258,30 @@ Written after a successful on-chain mint.
 | Off | Size | Field |
 |---:|---:|---|
 | 0 | 1 | `magic` = `0x41` (`'A'`) |
-| 1 | 1 | `version` = `0x01` |
+| 1 | 1 | `version` = `0x02` |
 | 2 | 2 | `serial` |
-| 4 | 8 | first 8 bytes of the transaction hash |
-| 12 | 4 | block number (`u32`) |
-| 16 | 4 | `tokenId` (`u32`) |
-| 20 | 8 | first 8 bytes of `cardHash` (keccak256 of the full stream) |
+| 4 | 32 | **the full transaction hash** |
+| 36 | 4 | block number (`u32`) |
+| 40 | 4 | `tokenId` (`u32`) |
+| 44 | 32 | **the full `cardHash`** (keccak256 of the stream) |
 
-28 bytes → 35 Z85 characters. `value` = `-(serial × 16 + 8)`, `tag` = `psc.<serial>.8`.
+**76 bytes → 95 Z85 characters**, of the 175 available. `value` = `-(serial × 16 + 8)`,
+`tag` = `psc.<serial>.8`.
+
+> **Version 1 of this row stored only the first 8 bytes of each hash, and that was a mistake.**
+> W7 found it while building the card detail endpoint: an 8-byte prefix cannot produce a working block
+> explorer link, so the "⛓️ ON-CHAIN" badge had nothing to point at. The truncation saved 48 bytes in a
+> row that has 140 bytes of capacity for a payload needing 76 — it was optimisation with nothing to
+> optimise for, and it cost the feature the row exists to serve.
+>
+> `version = 0x02` distinguishes the layouts. A decoder must accept both: `0x01` yields prefixes and
+> **no** `explorerUrl`, `0x02` yields full hashes and a working link. No card has been anchored yet, so
+> in practice only `0x02` will ever be written.
+
+Both an **encoder and a decoder** are required, and both live in `backend/app/chain/anchor_row.py`.
+The card detail endpoint reads chain state from this row and from nowhere else — in particular
+**`flags.on_chain` is not evidence of anchoring**; the row is. That is what stops a card claiming to be
+anchored in the gallery while denying it on its own page.
 
 ---
 

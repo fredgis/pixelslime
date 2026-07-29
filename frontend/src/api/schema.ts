@@ -572,21 +572,21 @@ export interface components {
             /** Format: date */
             mintDate: string;
             /** @description This card's 1-based bloom ordinal - the nth slime ever to bloom. Distinct from `serial` only if a serial is ever skipped. */
-            dayNumber?: number;
+            dayNumber: number;
             imageUrl: string;
             thumbUrl: string;
             /** @description Display name resolved from `biome_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.** */
-            biome?: string | null;
+            biome: string | null;
             /** @description Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.** */
-            mood?: string | null;
+            mood: string | null;
             /** @description Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.** */
-            companion?: string | null;
+            companion: string | null;
             /** @description Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present. */
-            onChain?: boolean;
+            onChain: boolean;
             /** @description Dominant colours of the artwork, so the UI can tint itself to the card. */
             palette?: string[];
             /** @description On-chain anchor. **Always present as a key; `null` when the card has not been anchored yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to distinguish absent from null. */
-            chain?: {
+            chain: {
                 tokenId?: number;
                 txHash?: string;
                 blockNumber?: number;

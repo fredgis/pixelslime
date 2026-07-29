@@ -340,7 +340,7 @@ components:
           description: Dominant colours of the artwork, so the UI can tint itself to the card.
           items: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
         chain:
-          type: object
+          type: [object, "null"]
           description: >-
             On-chain anchor. **Always present as a key; `null` when the card has not been anchored
             yet.** Never omitted, so a client can rely on `card.chain === null` rather than having to

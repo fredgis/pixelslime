@@ -105,6 +105,89 @@ async function main() {
   await settle(page, '/design');
   await shot(page, '09-design');
 
+  // ---- Targeted verification probes (tasks B / C / D) --------------------
+  console.log('verification probes');
+  const checks = [];
+
+  // D. Skip-link is hidden until focused, and is the first thing Tab reaches.
+  await settle(page, '/', (p) => p.getByRole('button', { name: /reveal today/i }).waitFor(), 400);
+  const skip = page.getByRole('link', { name: /skip to content/i });
+  const boxHidden = await skip.boundingBox();
+  const hiddenOk = !boxHidden || (boxHidden.width <= 2 && boxHidden.height <= 2);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(120);
+  const focusedIsSkip = await page.evaluate(() =>
+    /skip to content/i.test(document.activeElement?.textContent ?? ''),
+  );
+  const boxShown = await skip.boundingBox();
+  const shownOk = !!boxShown && boxShown.width > 20 && boxShown.height > 10;
+  await shot(page, '10-skiplink-focused');
+  checks.push(['D skip-link hidden off-focus (~1x1)', hiddenOk]);
+  checks.push(['D skip-link is first Tab stop', focusedIsSkip]);
+  checks.push(['D skip-link revealed on focus', shownOk]);
+
+  // B. Locked SLIMEDEX tiles must leak nothing about their tier (W5 fix).
+  await settle(page, '/dex', (p) => p.getByRole('group', { name: /filter by rarity/i }).waitFor(), 400);
+  const locked = await page.evaluate(() => {
+    const tiles = Array.from(document.querySelectorAll('.ps-tile.locked'));
+    const rartag = tiles.filter((t) => t.querySelector('.ps-tile__rartag')).length;
+    const undiscovered = tiles.filter((t) => t.querySelector('.ps-tile__locktag')).length;
+    const TIER = /(COMMON|UNCOMMON|RARE|EPIC|LEGENDARY|MYTHIC)/i;
+    const labelLeak = tiles.filter((t) => TIER.test(t.getAttribute('aria-label') ?? '')).length;
+    return { count: tiles.length, rartag, undiscovered, labelLeak };
+  });
+  checks.push([`B locked tiles present (${locked.count})`, locked.count > 0]);
+  checks.push(['B no rarity-house tag on locked tiles', locked.rartag === 0]);
+  checks.push(['B locked tiles show UNDISCOVERED', locked.undiscovered === locked.count]);
+  checks.push(['B no tier word in locked aria-label', locked.labelLeak === 0]);
+
+  // C. Provenance rows carry the card's own tag, not a hardcoded serial.
+  await settle(page, '/slime/14', (p) => p.getByRole('button', { name: /unseal/i }).waitFor(), 400);
+  await page.getByRole('button', { name: /unseal/i }).click();
+  await page.locator('[aria-labelledby="provenance-heading"] ol li').first().waitFor();
+  await page.waitForTimeout(400);
+  const tags = await page
+    .locator('[aria-labelledby="provenance-heading"] ol li')
+    .evaluateAll((lis) => lis.map((li) => li.querySelector('div span')?.textContent?.trim() ?? ''));
+  const tagsOk = tags.length > 0 && tags.every((t, i) => t === `psc.14.${i}`);
+  checks.push([`C provenance tags are psc.14.x [${tags.join(', ')}]`, tagsOk]);
+
+  // V5. The panel shows the real, variable stream length (serial 14 = 183 bytes / 2 rows),
+  //     never the old fixed 175. "175 bytes" survives only as the per-row constraint.
+  const provText = await page.locator('[aria-labelledby="provenance-heading"]').innerText();
+  const streamBytesOk = /\b183\s+BYTES/i.test(provText) && /175\s+BYTES\s*\/\s*ROW/i.test(provText);
+  checks.push([`V5 panel shows real 183 bytes + "175 / row" [${streamBytesOk}]`, streamBytesOk]);
+
+  // V3. Value column follows the codec sign convention: header row = positive YYYYMMDD
+  //     mint-date key, every continuation row = negative -(serial*16+part).
+  const vals = await page
+    .locator('[aria-labelledby="provenance-heading"] ol li')
+    .evaluateAll((lis) =>
+      lis.map((li) => {
+        const spans = Array.from(li.querySelectorAll('div span')).map((s) => s.textContent?.trim() ?? '');
+        return spans.find((t) => t.startsWith('val:')) ?? '';
+      }),
+    );
+  const headerPositive = /^val:\d{8}$/.test(vals[0] ?? '');
+  const contNegative = vals.length > 1 && vals.slice(1).every((v) => /^val:-\d+$/.test(v));
+  checks.push([`V3 header value is positive date [${vals[0] ?? ''}]`, headerPositive]);
+  checks.push([`V3 continuation value is negative [${vals.slice(1).join(', ')}]`, contNegative]);
+
+  // V4. An invalid serial (`/slime/abc`) shows the clean not-found screen, not an error/crash.
+  await settle(page, '/slime/abc', null, 500);
+  const notFoundText = await page.locator('body').innerText();
+  const cleanNotFound = /(LOST\?|WANDERED OFF|404)/i.test(notFoundText);
+  await shot(page, '11-invalid-serial-notfound');
+  checks.push([`V4 /slime/abc shows clean not-found screen`, cleanNotFound]);
+
+  console.log('  probe results:');
+  let probeFails = 0;
+  for (const [name, ok] of checks) {
+    if (!ok) probeFails += 1;
+    console.log(`    ${ok ? 'PASS' : 'FAIL'}  ${name}`);
+  }
+  console.log(`  probes: ${checks.length - probeFails}/${checks.length} passed`);
+
   await ctx.close();
 
   // ---- Reduced-motion pass -----------------------------------------------

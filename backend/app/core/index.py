@@ -28,6 +28,7 @@ from typing import Any, Protocol
 from app.asmdb import AsmDbError
 from app.codec import RARITIES, TYPES, Card, CodecError
 
+from .chain import ChainAnchor
 from .logging import get_logger
 from .source import CardSource
 from .time import mint_date, paris_today, yyyymmdd
@@ -57,6 +58,9 @@ class IndexEntry:
     mint_on: date
     yyyymmdd: int
     rarity_ordinal: int
+    #: Decoded ``part = 8`` anchor, or ``None`` when the card has no anchor row.
+    #: The single source of truth for both the summary and detail ``onChain`` (D2).
+    chain: ChainAnchor | None = None
 
 
 @dataclass(frozen=True)
@@ -70,13 +74,14 @@ class CardPage:
     has_more: bool
 
 
-def _entry(card: Card) -> IndexEntry:
+def _entry(card: Card, chain: ChainAnchor | None = None) -> IndexEntry:
     day = mint_date(card.mint_day)
     return IndexEntry(
         card=card,
         mint_on=day,
         yyyymmdd=yyyymmdd(day),
         rarity_ordinal=RARITIES.index(card.rarity),
+        chain=chain,
     )
 
 
@@ -93,9 +98,9 @@ class CardIndex:
         self.degraded = True
 
     # ── mutation ────────────────────────────────────────────────────────────
-    def upsert(self, card: Card) -> None:
+    def upsert(self, card: Card, chain: ChainAnchor | None = None) -> None:
         """Insert or replace a card and keep the date index consistent."""
-        entry = _entry(card)
+        entry = _entry(card, chain)
         previous = self._by_serial.get(card.serial)
         if (
             previous is not None
@@ -130,7 +135,8 @@ class CardIndex:
         Because the index.json base already carries known cards, a warm restart
         typically reads only the one card that bloomed since — the "fresher"
         fast-path from ``docs/PLAN.md`` §4.6. A single corrupt card is logged and
-        skipped rather than aborting the whole rebuild.
+        skipped rather than aborting the whole rebuild. The card's on-chain anchor
+        (part 8) is read at the same time so ``chain`` is captured off the hot path.
         """
         for serial in await source.list_serials():
             if serial in self._by_serial:
@@ -140,7 +146,7 @@ class CardIndex:
             except (AsmDbError, CodecError) as exc:
                 _log.warning("card_read_failed", serial=serial, error=str(exc))
                 continue
-            self.upsert(card)
+            self.upsert(card, await _read_chain(source, serial))
 
     # ── reads ───────────────────────────────────────────────────────────────
     @property
@@ -150,6 +156,15 @@ class CardIndex:
     def get(self, serial: int) -> Card | None:
         entry = self._by_serial.get(serial)
         return entry.card if entry is not None else None
+
+    def chain_for(self, serial: int) -> ChainAnchor | None:
+        """Return the decoded on-chain anchor for a serial, or ``None`` if unanchored.
+
+        Read straight from the pre-built entry so the gallery summary and the card
+        detail resolve ``onChain`` from the *same* fact and can never disagree (D2).
+        """
+        entry = self._by_serial.get(serial)
+        return entry.chain if entry is not None else None
 
     def contains(self, serial: int) -> bool:
         return serial in self._by_serial
@@ -213,22 +228,46 @@ class CardIndex:
 
     # ── persistence ─────────────────────────────────────────────────────────
     def to_json_bytes(self) -> bytes:
-        """Serialise the whole index to the ``index.json`` projection bytes."""
+        """Serialise the whole index to the ``index.json`` projection bytes.
+
+        Each entry carries its decoded anchor so a warm restart keeps a card's
+        on-chain status without re-reading asmDB (the reconcile only adds *new*
+        serials, so chain would otherwise be lost on the second boot).
+        """
         generated = self._generated_at or datetime.now(tz=UTC)
         payload = {
-            "version": 1,
+            "version": 2,
             "generatedAt": generated.isoformat(),
-            "cards": [entry.card.model_dump(mode="json") for entry in self._by_serial.values()],
+            "cards": [
+                {
+                    "card": entry.card.model_dump(mode="json"),
+                    "chain": entry.chain.to_storage_dict() if entry.chain is not None else None,
+                }
+                for entry in self._by_serial.values()
+            ],
         }
         return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
 
     def load_json_bytes(self, data: bytes) -> None:
-        """Populate the index from ``index.json`` bytes. Raises on malformed input."""
+        """Populate the index from ``index.json`` bytes. Raises on malformed input.
+
+        Accepts both the current ``{"card": ..., "chain": ...}`` entries and the
+        older flat card-dump entries (chain then resolves to ``None``).
+        """
         doc = json.loads(data)
         cards = doc.get("cards", [])
         if not isinstance(cards, list):
             raise ValueError("index.json 'cards' must be a list")
-        self.replace_all(Card.model_validate(card) for card in cards)
+        self._by_serial.clear()
+        self._by_date.clear()
+        for item in cards:
+            if isinstance(item, dict) and "card" in item:
+                card = Card.model_validate(item["card"])
+                chain = ChainAnchor.from_storage_dict(item.get("chain"))
+            else:
+                card = Card.model_validate(item)
+                chain = None
+            self.upsert(card, chain)
         generated = doc.get("generatedAt")
         if isinstance(generated, str):
             self._generated_at = datetime.fromisoformat(generated)
@@ -246,6 +285,19 @@ _SORT_REVERSE: dict[str, bool] = {
     "rarest": True,
     "happiest": True,
 }
+
+
+async def _read_chain(source: CardSource, serial: int) -> ChainAnchor | None:
+    """Read a card's anchor off the hot path, degrading to unanchored on any failure.
+
+    The absence of a decodable anchor row means "not anchored"; an asmDB hiccup on the
+    anchor read must not fail the card's indexing, so it is logged and treated as such.
+    """
+    try:
+        return await source.read_chain(serial)
+    except (AsmDbError, CodecError) as exc:
+        _log.warning("chain_read_failed", serial=serial, error=str(exc))
+        return None
 
 
 async def bootstrap_index(

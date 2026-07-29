@@ -19,12 +19,33 @@ const GENESIS_TOTAL = 365_000;
 const BLOOM_FEE = 100;
 const TOTAL_BLOOMS = 3_650;
 
-function notFound(message: string) {
-  return HttpResponse.json({ error: { code: 'not_found', message } }, { status: 404 });
+function errorResponse(status: number, code: string, message: string) {
+  return HttpResponse.json({ error: { code, message } }, { status });
 }
 
+/** 404 for a well-formed serial that simply isn't in the collection. */
+function cardNotFound(serial: number) {
+  return errorResponse(404, 'card_not_found', `No card with serial ${serial}`);
+}
+
+/**
+ * 422 for a serial that fails the contract's path schema (integer, 1..65535). Mirrors the
+ * real backend, whose FastAPI path validation reshapes into this exact envelope — so
+ * `/api/cards/abc` and out-of-range serials 422 here, never 404 (the disagreement W10 found).
+ */
+function invalidSerial(raw: string | readonly string[] | undefined) {
+  const text = Array.isArray(raw) ? raw[0] : (raw ?? '');
+  const message = /^-?\d+$/.test(text)
+    ? `path.serial: Input should be ${Number(text) < 1 ? 'greater than or equal to 1' : 'less than or equal to 65535'}`
+    : 'path.serial: Input should be a valid integer, unable to parse string as an integer';
+  return errorResponse(422, 'invalid_request', message);
+}
+
+/** Parse a path serial exactly as the backend's `SerialPath` does: an integer in 1..65535. */
 function parseSerial(raw: string | readonly string[] | undefined): number | null {
-  const value = Number(Array.isArray(raw) ? raw[0] : raw);
+  const text = Array.isArray(raw) ? raw[0] : raw;
+  if (text === undefined || !/^-?\d+$/.test(text)) return null;
+  const value = Number(text);
   if (!Number.isInteger(value) || value < 1 || value > 65_535) return null;
   return value;
 }
@@ -121,7 +142,7 @@ export const handlers = [
   http.get('/api/cards/today', async () => {
     await delay(LATENCY);
     const card = CARDS_BY_SERIAL.get(TODAY_SERIAL);
-    if (!card) return notFound('No card has bloomed today yet');
+    if (!card) return errorResponse(404, 'no_card_today', 'No card has bloomed today yet');
     const now = new Date();
     const next = nextBloomAt(now);
     return HttpResponse.json({
@@ -165,36 +186,40 @@ export const handlers = [
   http.get('/api/cards/:serial/raw', async ({ params }) => {
     await delay(LATENCY);
     const serial = parseSerial(params.serial);
-    const card = serial ? CARDS_BY_SERIAL.get(serial) : undefined;
-    if (!card) return notFound('No such card');
+    if (serial === null) return invalidSerial(params.serial);
+    const card = CARDS_BY_SERIAL.get(serial);
+    if (!card) return cardNotFound(serial);
     return HttpResponse.json(buildRaw(card));
   }),
 
   http.get('/api/cards/:serial/image', ({ params }) => {
     const serial = parseSerial(params.serial);
-    const card = serial ? CARDS_BY_SERIAL.get(serial) : undefined;
-    if (!card) return notFound('No such card');
+    if (serial === null) return invalidSerial(params.serial);
+    const card = CARDS_BY_SERIAL.get(serial);
+    if (!card) return cardNotFound(serial);
     if (card.imageUrl.startsWith('/mock/')) {
       return HttpResponse.redirect(card.imageUrl, 302);
     }
-    return svgResponse(serial!);
+    return svgResponse(serial);
   }),
 
   http.get('/api/cards/:serial/thumb', ({ params }) => {
     const serial = parseSerial(params.serial);
-    const card = serial ? CARDS_BY_SERIAL.get(serial) : undefined;
-    if (!card) return notFound('No such card');
+    if (serial === null) return invalidSerial(params.serial);
+    const card = CARDS_BY_SERIAL.get(serial);
+    if (!card) return cardNotFound(serial);
     if (card.thumbUrl.startsWith('/mock/')) {
       return HttpResponse.redirect(card.thumbUrl, 302);
     }
-    return svgResponse(serial!);
+    return svgResponse(serial);
   }),
 
   http.get('/api/cards/:serial', async ({ params }) => {
     await delay(LATENCY);
     const serial = parseSerial(params.serial);
-    const card = serial ? CARDS_BY_SERIAL.get(serial) : undefined;
-    if (!card) return notFound('No such card');
+    if (serial === null) return invalidSerial(params.serial);
+    const card = CARDS_BY_SERIAL.get(serial);
+    if (!card) return cardNotFound(serial);
     return HttpResponse.json(card);
   }),
 
@@ -206,8 +231,9 @@ export const handlers = [
   http.get('/api/nft/:serial', async ({ params }) => {
     await delay(LATENCY);
     const serial = parseSerial(params.serial);
-    const card = serial ? CARDS_BY_SERIAL.get(serial) : undefined;
-    if (!card) return notFound('No such card');
+    if (serial === null) return invalidSerial(params.serial);
+    const card = CARDS_BY_SERIAL.get(serial);
+    if (!card) return cardNotFound(serial);
     return HttpResponse.json({
       name: `${card.name} · ${card.cardId}`,
       description: `${card.personality} — a ${card.rarity} ${card.type} PixelSlime.`,

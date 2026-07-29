@@ -13,6 +13,7 @@ import pytest
 from _api_helpers import ClientFactory, load_fixture_card
 from fastapi.testclient import TestClient
 
+from app.chain import AnchorResult
 from app.codec import Card
 from app.core.config import Settings
 from app.core.secrets import SecretProvider
@@ -26,7 +27,9 @@ def make_client() -> Iterator[ClientFactory]:
     """Return a factory that builds an app+client around in-memory fakes.
 
     Each call seeds the given ``cards``, wires an optional admin token, and enters
-    the client's context so the lifespan runs (building the index). Every client is
+    the client's context so the lifespan runs (building the index). Anchor rows in
+    ``anchors`` are stored *before* the index builds, so a card's on-chain status is
+    resolved from the anchor row exactly as production resolves it. Every client is
     closed at teardown.
     """
     opened: list[TestClient] = []
@@ -34,6 +37,7 @@ def make_client() -> Iterator[ClientFactory]:
     def _make(
         *,
         cards: Iterable[Card] = (),
+        anchors: Iterable[AnchorResult] = (),
         admin_token: str | None = None,
         awake: bool = True,
         trust_forwarded_for: bool = True,
@@ -49,6 +53,8 @@ def make_client() -> Iterator[ClientFactory]:
                 f"PNG-{card.serial}".encode(),
                 f"WEBP-{card.serial}".encode(),
             )
+        for anchor in anchors:
+            source.add_anchor(anchor)
         settings = Settings(
             local_dev=True,
             rate_limit_capacity=rate_capacity,
