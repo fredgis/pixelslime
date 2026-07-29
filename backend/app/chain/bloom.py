@@ -48,6 +48,13 @@ POOL_ABI: list[dict[str, Any]] = [
     },
     {
         "type": "function",
+        "name": "bloomRecorded",
+        "stateMutability": "view",
+        "inputs": [{"name": "serial", "type": "uint256"}],
+        "outputs": [{"name": "", "type": "bool"}],
+    },
+    {
+        "type": "function",
         "name": "totalYieldMinted",
         "stateMutability": "view",
         "inputs": [],
@@ -89,8 +96,20 @@ class ClaimPoolWriter:
         self._contract = web3.eth.contract(address=pool_address, abi=abi or POOL_ABI)
 
     def already_recorded(self, serial: int) -> bool:
-        """True when this serial has already minted yield, so a re-run can skip it."""
-        return int(self._contract.functions.yieldByCard(serial).call()) > 0
+        """True when this serial's bloom has already happened.
+
+        Prefers the pool's ``bloomRecorded`` flag, which is authoritative and correct
+        even for a card whose yield is zero. Falls back to ``yieldByCard > 0`` for
+        pools deployed before that flag existed — a weaker test, because a
+        zero-happiness card leaves no trace in that mapping and would be waved through
+        again. The fallback is why the flag was added; it is kept only so the currently
+        deployed pool remains usable.
+        """
+        try:
+            return bool(self._contract.functions.bloomRecorded(serial).call())
+        except Exception:
+            _log.warning("bloom_flag_unavailable", serial=serial, fallback="yieldByCard")
+            return int(self._contract.functions.yieldByCard(serial).call()) > 0
 
     def _fee_fields(self) -> dict[str, int]:
         try:

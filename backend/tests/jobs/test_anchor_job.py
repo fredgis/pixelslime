@@ -63,16 +63,26 @@ class StubAnchorer:
 
 
 class StubBloomRecorder:
-    """Stands in for ClaimPool.recordBloom."""
+    """Stands in for ClaimPool.recordBloom, including its refusal to repeat.
+
+    The real pool now rejects a second bloom for the same serial, so this stub does
+    too. Modelling that here matters: the job deliberately re-attempts a bloom it
+    cannot prove succeeded, and it is the pool — not the caller — that must be the
+    thing which makes a double burn impossible.
+    """
 
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.calls: list[tuple[int, str, int]] = []
+        self.recorded: set[int] = set()
 
     def record_bloom(self, serial: int, rarity: str, happiness: int) -> bytes | None:
         if self.fail:
             raise RuntimeError("pool unreachable")
+        if serial in self.recorded:
+            return None
         self.calls.append((serial, rarity, happiness))
+        self.recorded.add(serial)
         return b"\xbb" * 32
 
 
@@ -258,6 +268,9 @@ async def test_a_successful_anchor_records_the_bloom() -> None:
 
 @pytest.mark.asyncio
 async def test_the_bloom_is_not_recorded_twice_for_the_same_card() -> None:
+    # The job re-attempts a bloom it cannot prove succeeded, so the pool is what makes
+    # a double burn impossible. This pins that the *effect* happens once, not that the
+    # call happens once — the weaker of those two was all the client could ever offer.
     deps, _, _ = _seeded()
     recorder = StubBloomRecorder()
     deps = replace(deps, bloom=recorder)
@@ -266,6 +279,7 @@ async def test_the_bloom_is_not_recorded_twice_for_the_same_card() -> None:
     await anchor_serial(1, deps=deps)
 
     assert len(recorder.calls) == 1
+    assert recorder.recorded == {1}
 
 
 @pytest.mark.asyncio
@@ -280,6 +294,24 @@ async def test_a_bloom_failure_does_not_lose_the_anchor() -> None:
 
     assert outcome.anchored is True
     assert (1 * 16 + 8) in db.rows
+
+
+@pytest.mark.asyncio
+async def test_a_failed_bloom_is_retried_on_the_next_run() -> None:
+    # The anchor row short-circuits the mint, which is correct — minting is not
+    # repeatable. But the bloom is a separate, retryable act, and returning early on
+    # the row meant a swallowed bloom failure could never be recovered: the fee would
+    # never be burned for that card, leaving the ten-year schedule permanently short
+    # with nothing to signal it.
+    deps, _, card = _seeded()
+    failing = StubBloomRecorder(fail=True)
+    await anchor_serial(1, deps=replace(deps, bloom=failing))
+
+    recovering = StubBloomRecorder()
+    outcome = await anchor_serial(1, deps=replace(deps, bloom=recovering))
+
+    assert outcome.anchored is False  # the card was already on-chain
+    assert recovering.calls == [(1, card.rarity, card.happiness)]
 
 
 def test_encode_is_importable() -> None:

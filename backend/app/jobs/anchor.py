@@ -123,7 +123,16 @@ async def anchor_serial(serial: int, *, deps: AnchorDependencies) -> AnchorOutco
         except AsmDbNotFound:
             pass
         else:
+            # The card is already anchored, so the mint must not be retried — it is not
+            # repeatable. The bloom is a different matter: it is a separate, retryable
+            # act, and a previous run may have anchored successfully and then failed to
+            # record it. Returning here without re-attempting would strand that card
+            # unbloomed forever, leaving the ten-year schedule quietly short. Repeating
+            # a bloom that did succeed is safe — the pool refuses it.
             _log.info("anchor_row_already_present", serial=serial)
+            rows = await deps.repository.read_card_rows(serial)
+            if rows:
+                _record_bloom(deps, _card_from_rows(rows))
             return AnchorOutcome(serial=serial, anchored=False)
 
         rows = await deps.repository.read_card_rows(serial)

@@ -17,7 +17,7 @@
 | Platform FQDN | `ca-pixelslime-api.blackbay-470e05c9.swedencentral.azurecontainerapps.io` |
 | Apex domain | `pixelslime.cloud` is present with a disabled binding; its managed certificate is failed |
 | Live health | `{"status":"ok","cards":1,"engine":"1.7.0"}` |
-| Active image | `crpixelslimededh2k35j5.azurecr.io/pixelslime:v9` |
+| Active images | API `crpixelslimededh2k35j5.azurecr.io/pixelslime:v10`; both jobs `pixelslime:v9` |
 | Database | asmDB Cloud · `smilesdb` · instance `<ASMDB_INSTANCE>` |
 | Chain | Polygon **Amoy** testnet · chain id `80002` |
 
@@ -105,10 +105,11 @@ flowchart TB
     class KV orange
 ```
 
-The API and both jobs run the **same immutable image** with different entrypoints. The API owns the
-public read path; generation owns AI, blob and card-row writes; anchoring owns chain writes. Keeping
-anchoring separate means an RPC outage can never roll back or suppress a valid card already stored in
-asmDB.
+All three workloads are built from the **same application image**, selected by entrypoint, but the
+live revisions currently differ: the API is on `v10`, while both jobs remain on `v9`. The API owns
+the public read path; generation owns AI, blob and card-row writes; anchoring owns chain writes.
+Keeping anchoring separate means an RPC outage can never roll back or suppress a valid card already
+stored in asmDB.
 
 ---
 
@@ -314,6 +315,7 @@ flowchart TB
     PENDING(["Leave pending and log loudly<br/><i>never invent provenance</i>"])
     WRITE["Write anchor row part 8<br/>tx hash · block · token id · cardHash"]
     DONE(["Anchor visible to the read model"])
+    BLOOM["Call ClaimPool recordBloom<br/>burn 100 SMILE · mint card yield"]
 
     CRON --> LIST --> ROW
     ROW -->|yes| NOOP
@@ -323,6 +325,7 @@ flowchart TB
     FOUND -->|no| PENDING
     FOUND -->|yes| WRITE
     WRITE --> DONE
+    WRITE -.-> BLOOM
 
     classDef gold fill:#FFD86B,stroke:#2B1B4A,stroke-width:4px,color:#2B1B4A
     classDef pink fill:#FF8FC5,stroke:#2B1B4A,stroke-width:3px,color:#2B1B4A
@@ -334,7 +337,7 @@ flowchart TB
     class CRON lilac
     class LIST,READ,LOGS blue
     class ROW,MINTED,FOUND gold
-    class MINT,WRITE pink
+    class MINT,WRITE,BLOOM pink
     class NOOP,DONE mint
     class PENDING orange
 ```
@@ -347,10 +350,11 @@ a default 200,000-block lookback in **900-block windows** because public Amoy RP
 `eth_getLogs` ranges. The live job uses `https://polygon-amoy.drpc.org`; the earlier publicnode endpoint
 refused the required log calls.
 
-`recordBloom` is deliberately **not** part of `daily`. The active `pixelslime:v9` anchor job now
-supplies `CLAIM_POOL_ADDRESS` and constructs `ClaimPoolWriter`, so future fresh anchors also burn the
-fee and mint yield. Mochibo's transaction remains manual because it pre-dates that deployment. The
-retry/idempotency limitation in §11 still needs hardening.
+`recordBloom` is deliberately **not** part of `daily`. The active `pixelslime:v9` anchor job supplies
+`CLAIM_POOL_ADDRESS` and constructs `ClaimPoolWriter`, so its fresh-anchor path is configured to burn
+the fee and mint yield. No card has been freshly anchored since that revision was deployed, so this
+automation is configured but not yet demonstrated end to end. Mochibo's transaction remains manual
+because it pre-dates that deployment. The retry/idempotency limitation in §11 still needs hardening.
 
 ---
 
@@ -443,22 +447,38 @@ fills a pool that purse cannot reach.** Claims can later pay keepers out of the 
 has no withdrawal path. That separation is what makes the fee real rather than the Treasury paying
 itself.
 
-The contracts implement this flow, and `pixelslime:v9` now invokes it from the **anchor job**, after
-part 8 is safely written. It is intentionally absent from the daily generation transaction. Mochibo's
-`recordBloom` transaction was sent manually because the automation was deployed afterwards.
+The contracts implement this flow, and the `pixelslime:v9` **anchor job** is configured to invoke it
+after part 8 is safely written. It is intentionally absent from the daily generation transaction.
+No post-deployment card has yet exercised that path; Mochibo's `recordBloom` transaction was sent
+manually because the automation was deployed afterwards.
 
 Three ways this could have been faked, all closed in code and tested:
 
 | Hole | Why it mattered | Fix |
 |---|---|---|
-| `admin == treasury` | An admin can `grantRole(MINTER_ROLE, self)` and refill the Rain — the burn becomes theatre | the live deploy script rejected equality and role readbacks confirm distinct powers; repository HEAD now also rejects it in the constructor for future deployments |
+| `admin == treasury` | An admin can `grantRole(MINTER_ROLE, self)` and refill the Rain — the burn becomes theatre | the live bytecode relied solely on `Deploy.s.sol` to reject equality; role readbacks confirm that deployment is compliant; repository HEAD now adds constructor enforcement for future `SmileToken` deployments |
 | Voucher had no expiry | A leaked voucher was claimable forever with no way to rotate it out | `deadline` added to the signed tuple |
 | Backend supplied the yield amount | A compromised backend key mints unlimited supply | Formula moved on-chain; the job supplies inputs, never payouts |
+
+> **That enforcement boundary matters.** The deployed instances predate the constructor hardening.
+> In the source version that produced them, `SmileToken` and `ClaimPool` rejected zero addresses but
+> did not reject `admin == treasury`; the **only** guard was
+> `require(a.admin != a.treasury, ...)` in `chain/script/Deploy.s.sol`. Deploying that version by any
+> other route silently lost the no-refill guarantee. The parallel hardening has since landed in
+> repository HEAD for `SmileToken`, so future token deployments are self-enforcing; the deployed
+> bytecode does not gain that check retroactively.
+>
+> The live deployment is nevertheless compliant:
+> `SmileToken.hasRole(MINTER_ROLE, admin) == false` and
+> `SmileToken.hasRole(MINTER_ROLE, treasury) == false`. It will not be redeployed merely to inherit
+> the new guard. Mochibo's recorded mint and asmDB anchor row establish the current
+> `PixelSlimeCard` as the canonical card contract; replacing that address would orphan its
+> provenance.
 
 Simulating all 3,650 blooms in Foundry ends with the Genesis Rain at **exactly zero** and **904,050
 SMILE** in existence — all of it earned, none of it decreed. It is a knife-edge: bloom 3,651 reverts,
 and a day skipped and never recorded leaves dust forever. That makes backfill plus bloom recovery
-structural once the automated economy path is deployed.
+structural.
 
 ### 6.1 Two tokens, one letter apart
 
@@ -495,8 +515,8 @@ assignment forces `publicNetworkAccess: Disabled` and reverts any change within 
 private endpoint for Key Vault was provisioned, so its data plane is unreachable from the app.
 
 Amoy therefore signs with a raw key held in a **Container Apps secret**. That is a real reduction in
-security, not an equivalent alternative: anyone with RBAC on the container app can read it. It is
-acceptable only because these tokens carry no value.
+security, not an equivalent alternative: a principal with Container Apps secret-read permissions can
+retrieve it. It is acceptable only because these tokens carry no value.
 
 Rather than leave that as a warning comment for a future reader to respect, the limit is enforced:
 
@@ -565,7 +585,7 @@ decoded card, so the API can expose a per-card yield and collection totals with 
 rarity ordinals to Solidity's enum order.
 
 This projection is a **display model, not a ledger**. The chain remains authoritative because a card
-can exist before its bloom transaction does. The active `pixelslime:v9` API exposes `smileYield`,
+can exist before its bloom transaction does. The active `pixelslime:v10` API exposes `smileYield`,
 `genesisBurned`, `genesisTotal` and `poolTotal`; the live Mochibo response reports 760, 100, 365,000
 and 760 respectively.
 
@@ -657,9 +677,9 @@ the child resources needed to explain the network and platform-generated integra
 
 | Type | Exact name | Purpose and observed state | Ownership |
 |---|---|---|---|
-| Container App | `ca-pixelslime-api` | public FastAPI + built React SPA; 0–3 replicas; active image `pixelslime:v9` | Bicep |
-| Container Apps Job | `caj-pixelslime-daily` | cron `0 8,9 * * *`; currently dispatches `seed`, not the Bicep default `daily` | Bicep resource, live config drift |
-| Container Apps Job | `caj-pixelslime-anchor` | cron `30 8,9 * * *`; anchors every unanchored serial and now calls ClaimPool; owns the raw-key signer secret | live only; absent from Bicep |
+| Container App | `ca-pixelslime-api` | public FastAPI + built React SPA; 0–3 replicas; active image `pixelslime:v10` | Bicep |
+| Container Apps Job | `caj-pixelslime-daily` | image `pixelslime:v9`; cron `0 8,9 * * *`; currently dispatches `seed`, not the Bicep default `daily` | Bicep resource, live config drift |
+| Container Apps Job | `caj-pixelslime-anchor` | image `pixelslime:v9`; cron `30 8,9 * * *`; anchors every unanchored serial and is configured to call ClaimPool; owns the raw-key signer secret | live only; absent from Bicep |
 | Container Apps environment | `cae-pixelslime` | external Consumption environment injected into `snet-aca`; not zone-redundant | Bicep |
 | Managed certificate | `cae-pixelslime/mc-cae-pixelslime-www-pixelslime-c-1965` | `www.pixelslime.cloud`; `Succeeded`; CNAME validation; bound `SniEnabled` | live domain binding |
 | Managed certificate | `cae-pixelslime/mc-cae-pixelslime-pixelslime-cloud-3447` | apex `pixelslime.cloud`; `Failed`; TXT validation; app binding disabled | live domain binding |
@@ -770,15 +790,15 @@ publish daily.
 | Area | Reality on 2026-07-29 | Consequence |
 |---|---|---|
 | Daily dispatch | `caj-pixelslime-daily` has `PIXELSLIME_JOB=seed` | the named daily resource will not run `daily` until reset |
-| Bloom accounting | `recordBloom` is wired into the v9 anchor job, not `daily`; Mochibo's earlier bloom was manual | future blooms are automatic after anchoring, subject to the retry flaw below |
+| Bloom accounting | `recordBloom` is configured in the v9 anchor job, not `daily`; Mochibo's earlier bloom was manual and no later fresh anchor has exercised the path | automatic burn/mint is not yet demonstrated end to end and remains subject to the retry flaw below |
 | Chain key custody | raw secp256k1 key in Container Apps secret `chain-signer-key` | no HSM boundary; acceptable only under the enforced testnet guard |
 | Apex domain | `pixelslime.cloud` binding disabled; managed certificate failed | only `www.pixelslime.cloud` and the platform FQDN serve valid HTTPS |
 | NFT metadata | PS-0001 points to the unbound apex and `/api/cards/1`, not `/api/nft/1` | provenance works, wallet metadata does not |
 | IaC coverage | anchor job and domains are absent from Bicep | redeploying the repository alone cannot reconstruct the live estate |
 | Index propagation | startup sweeps all unanchored entries; warm-loop polling trusts a flag that generated cards leave clear | a new anchor may remain visually pending until process restart |
 
-> ⚠️ **Automatic `recordBloom` is enabled, but its retry key still needs hardening.** The source writes part 8 before
-> calling the pool, then returns immediately on any later run that sees part 8. A failed bloom is
+> ⚠️ **Automatic `recordBloom` is configured, but its retry key still needs hardening.** The source
+> writes part 8 before calling the pool, then returns immediately on any later run that sees part 8. A failed bloom is
 > therefore logged but not retried by the scheduled job. `ClaimPoolWriter.already_recorded()` also uses
 > `yieldByCard(serial) > 0`; a schema-valid zero-happiness card mints zero yield, so that test cannot
 > distinguish “recorded” from “never recorded” even though the 100-SMILE burn still occurred.

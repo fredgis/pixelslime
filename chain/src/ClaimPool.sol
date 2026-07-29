@@ -68,6 +68,13 @@ contract ClaimPool is AccessControl, EIP712, ReentrancyGuard {
     mapping(uint256 serial => uint256) public yieldByCard;
     mapping(uint256 nonce => bool) public nonceUsed;
 
+    /// @notice Whether a serial's bloom has been recorded, independently of its yield.
+    /// @dev Kept separate from `yieldByCard` on purpose. A card with zero happiness
+    ///      mints nothing, so `yieldByCard` would stay at zero and any "already done?"
+    ///      test built on it would wave the same serial through again and again,
+    ///      burning the Bloom Fee each time. The flag records the *event*, not its size.
+    mapping(uint256 serial => bool) public bloomRecorded;
+
     /// @notice A signed authorisation to withdraw `amount` from the pool.
     struct ClaimVoucher {
         address wallet;
@@ -85,6 +92,10 @@ contract ClaimPool is AccessControl, EIP712, ReentrancyGuard {
     error ZeroAddress();
     error BadMultiplierCount();
     error HappinessOutOfRange(uint256 happiness);
+    /// @dev Raised when a serial's bloom has already been recorded. Idempotency is
+    ///      enforced here rather than by the caller, because the caller's only usable
+    ///      signal was `yieldByCard > 0`, which a zero-happiness card never trips.
+    error BloomAlreadyRecorded(uint256 serial);
     error VoucherExpired(uint256 deadline);
     error ZeroAmount();
     error BadVoucherSignature();
@@ -156,6 +167,16 @@ contract ClaimPool is AccessControl, EIP712, ReentrancyGuard {
         if (happiness > MAX_HAPPINESS) {
             revert HappinessOutOfRange(happiness);
         }
+        // The ten-year calendar is exactly 365,000 / 100, so a serial that burns the
+        // fee twice does not merely double-count -- it removes a day from the end of
+        // the schedule. A retry after an RPC timeout that actually succeeded is the
+        // ordinary way this happens, so it is refused here rather than left to the
+        // caller to remember.
+        if (bloomRecorded[serial]) {
+            revert BloomAlreadyRecorded(serial);
+        }
+        bloomRecorded[serial] = true;
+
         // Left branch: the Treasury's finite puddle shrinks by exactly the fee.
         smile.burnFrom(treasury, BLOOM_FEE);
 

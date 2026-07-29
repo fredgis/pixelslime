@@ -46,9 +46,44 @@ contract ClaimPoolTest is W9EconomyFixture {
         }
     }
 
+    /// @notice A serial must never be able to burn the Bloom Fee twice.
+    /// @dev The whole ten-year schedule is `365,000 / 100 = 3,650`. Nothing in the
+    ///      contract stopped `recordBloom` being called twice for the same serial, so
+    ///      a retried job — after an RPC timeout that in fact succeeded, say — would
+    ///      burn 200 for one card and silently shorten the calendar. The backend held
+    ///      the only guard, and it was a client-side read of `yieldByCard > 0`.
+    function test_ASerialCannotBeBloomedTwice() public {
+        vm.prank(bloomer);
+        pool.recordBloom(500, Rarity.EPIC, 75);
+        uint256 treasuryAfterFirst = smile.balanceOf(treasury);
+
+        vm.prank(bloomer);
+        vm.expectRevert(abi.encodeWithSelector(ClaimPool.BloomAlreadyRecorded.selector, 500));
+        pool.recordBloom(500, Rarity.EPIC, 75);
+
+        assertEq(smile.balanceOf(treasury), treasuryAfterFirst, "no second burn");
+    }
+
+    /// @dev The dangerous case the `yieldByCard > 0` guard could never catch: a card
+    ///      whose yield is legitimately zero leaves no trace in that mapping, so every
+    ///      retry burned another 100 forever. Idempotency must not depend on the
+    ///      payout being non-zero.
+    function test_AZeroYieldBloomIsStillRecordedOnce() public {
+        vm.prank(bloomer);
+        pool.recordBloom(501, Rarity.COMMON, 0);
+        uint256 treasuryAfterFirst = smile.balanceOf(treasury);
+        assertEq(pool.yieldByCard(501), 0, "zero happiness yields nothing");
+
+        vm.prank(bloomer);
+        vm.expectRevert(abi.encodeWithSelector(ClaimPool.BloomAlreadyRecorded.selector, 501));
+        pool.recordBloom(501, Rarity.COMMON, 0);
+
+        assertEq(smile.balanceOf(treasury), treasuryAfterFirst, "zero-yield card burns once");
+        assertTrue(pool.bloomRecorded(501), "recorded flag is set even at zero yield");
+    }
+
     function test_OnlyBloomRoleCanRecordBloom() public {
-        vm.prank(treasury);
-        vm.expectRevert(
+        vm.prank(treasury);        vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector, treasury, BLOOM_ROLE
             )
