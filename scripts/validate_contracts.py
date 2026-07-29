@@ -31,6 +31,40 @@ FORBIDDEN = {"\x00", "\x1f", "\r", "\n"}
 failures: list[str] = []
 
 
+class _StrictLoader(yaml.SafeLoader):
+    """YAML loader that refuses duplicate mapping keys.
+
+    PyYAML silently keeps the last value when a key repeats, which is how an
+    edit once left two `biome` and two `companion` keys in the Card schema
+    without anything complaining. In a file that two workstreams generate code
+    from, a silently-dropped key is a contract divergence waiting to happen.
+    """
+
+
+def _no_duplicate_keys(loader: _StrictLoader, node: yaml.MappingNode, deep: bool = False) -> dict:
+    seen: set = set()
+    dups: list = []
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            dups.append(key)
+        seen.add(key)
+    if dups:
+        raise yaml.YAMLError(f"duplicate keys: {sorted(map(str, dups))}")
+    return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+
+_StrictLoader.construct_mapping = _no_duplicate_keys  # type: ignore[method-assign]
+
+
+def load_yaml_strict(path: Path) -> dict:
+    try:
+        return yaml.load(path.read_text(encoding="utf-8"), Loader=_StrictLoader)
+    except yaml.YAMLError as exc:
+        fail(f"{path.name}: {exc}")
+        return {}
+
+
 def fail(msg: str) -> None:
     failures.append(msg)
     print(f"  FAIL  {msg}")
@@ -66,7 +100,7 @@ def check_fixtures(validator: Draft202012Validator) -> None:
 
 
 def check_openapi() -> None:
-    spec = yaml.safe_load((CONTRACTS / "openapi.yaml").read_text(encoding="utf-8"))
+    spec = load_yaml_strict(CONTRACTS / "openapi.yaml")
     if not str(spec.get("openapi", "")).startswith("3.1"):
         fail("openapi.yaml is not OpenAPI 3.1")
     if not spec.get("paths"):
@@ -74,7 +108,7 @@ def check_openapi() -> None:
     for name, schema in spec.get("components", {}).get("schemas", {}).items():
         Draft202012Validator.check_schema(schema)
         _ = name
-    print(f"  ok    openapi.yaml — {len(spec.get('paths', {}))} paths")
+    print(f"  ok    openapi.yaml — {len(spec.get('paths', {}))} paths, no duplicate keys")
 
 
 def check_tokens() -> None:

@@ -326,14 +326,13 @@ components:
         power_name:  { type: string, maxLength: 20 }
         power_desc:  { type: string, maxLength: 90 }
         quote:       { type: string, maxLength: 40 }
-        biome:     { type: string }
-        companion: { type: string }
         mintDate: { type: string, format: date }
         dayNumber: { type: integer, description: "This card's 1-based bloom ordinal - the nth slime ever to bloom. Distinct from `serial` only if a serial is ever skipped." }
         imageUrl:  { type: string }
         thumbUrl:  { type: string }
-        biome:     { type: string, nullable: true, description: "Display name resolved from `biome_id` through contracts/lookups.json." }
-        companion: { type: string, nullable: true, description: "Display name resolved from `companion_id` through contracts/lookups.json. **`null` when the card has no companion.**" }
+        biome:     { type: string, nullable: true, description: "Display name resolved from `biome_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
+        mood:      { type: string, nullable: true, description: "Display name resolved from `mood_id` through contracts/lookups.json. **Always present as a key; `null` when the id is out of range.**" }
+        companion: { type: string, nullable: true, description: "Display name resolved from `companion_id` through contracts/lookups.json. **Always present as a key; `null` when the card has no companion.**" }
         onChain:   { type: boolean, description: "Convenience mirror of `chain != null`, so a client never has to reach into the object just to render a badge. Always present." }
         palette:
           type: array
