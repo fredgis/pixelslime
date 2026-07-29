@@ -28,7 +28,7 @@ import {
   type ConfettiHandle,
   type StatKey,
 } from '@/design';
-import { useCards, useToday } from '@/api/client';
+import { useCards, useStats, useToday } from '@/api/client';
 import { ApiRequestError } from '@/api/client';
 import { formatMintDate, paletteBackground, toSlimeCardData } from '@/lib/cards';
 import { useAmbientStore } from '@/store/ambient';
@@ -103,6 +103,10 @@ function RecentRail({ excludeSerial }: { excludeSerial?: number }): ReactElement
 
 function PreBloom(): ReactElement {
   const navigate = useNavigate();
+  const stats = useStats();
+  // The slime still forming is the next one after everything already collected, so the
+  // day number is knowable before the card itself exists.
+  const nextDay = typeof stats.data?.total === 'number' ? stats.data.total + 1 : null;
   return (
     <div className="flex flex-col items-center gap-10">
       <section className="ps-hero w-full">
@@ -168,7 +172,14 @@ function PreBloom(): ReactElement {
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
-          <Countdown label="NEXT SLIME IN" />
+          <div className="flex flex-wrap items-center gap-3">
+            {nextDay !== null ? (
+              <Ribbon icon="✦" tone={tokens.color.bubblegum}>
+                DAY {nextDay} · INCOMING
+              </Ribbon>
+            ) : null}
+            <Countdown label="NEXT SLIME IN" />
+          </div>
 
           <h2 className="font-pixel text-[30px] leading-tight text-ink">Today’s Bloom:</h2>
           <p
@@ -278,6 +289,7 @@ export function TodayPage(): ReactElement {
       <div className="grid w-full gap-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
         <div ref={shakeRef} className="w-full max-w-[360px] justify-self-center lg:justify-self-start">
           <CardFlip
+            revealed={revealed}
             onReveal={handleReveal}
             seal="✦ PIXEL RAIN ✦"
             hint="CLICK OR PRESS ENTER"
