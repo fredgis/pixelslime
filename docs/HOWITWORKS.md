@@ -446,7 +446,7 @@ history backwards to recover the transaction, because a mint can never be repeat
 |---|---|---|
 | `SmileToken` | [`0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798`](https://amoy.polygonscan.com/token/0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798) | the **SMILE** currency |
 | `PixelSlimeCard` | [`0xD88928B55CefcAe756e55824a48342cA432Baf7f`](https://amoy.polygonscan.com/token/0xD88928B55CefcAe756e55824a48342cA432Baf7f) | the **SLIME** cards |
-| `ClaimPool` | `0x02a6887730894E39B437eB0A4AB457d98167Fc0f` | burns the fee, mints the yield |
+| `ClaimPool` | `0xbce1362c1155777df19F9cea6c8ECa68B155160d` | burns the fee, mints the yield |
 | `SlimeAdoption` | `0x20d6A4F365d00b4d27726f13093Dc2C497473CcA` | spend SMILE to adopt |
 
 ---

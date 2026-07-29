@@ -538,8 +538,26 @@ All four addresses contain deployed bytecode. PolygonScan currently labels each 
 |---|---|---|
 | `SmileToken` | [`0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798`](https://amoy.polygonscan.com/token/0x0BBaC39Bf418ab63BF71802808A4C63D4B39b798) | the $SMILE currency |
 | `PixelSlimeCard` | [`0xD88928B55CefcAe756e55824a48342cA432Baf7f`](https://amoy.polygonscan.com/token/0xD88928B55CefcAe756e55824a48342cA432Baf7f) | the SLIME cards |
-| `ClaimPool` | [`0x02a6887730894E39B437eB0A4AB457d98167Fc0f`](https://amoy.polygonscan.com/address/0x02a6887730894E39B437eB0A4AB457d98167Fc0f) | burns the fee, mints the yield |
+| `ClaimPool` | [`0xbce1362c1155777df19F9cea6c8ECa68B155160d`](https://amoy.polygonscan.com/address/0xbce1362c1155777df19F9cea6c8ECa68B155160d) | burns the fee, mints the yield |
 | `SlimeAdoption` | [`0x20d6A4F365d00b4d27726f13093Dc2C497473CcA`](https://amoy.polygonscan.com/address/0x20d6A4F365d00b4d27726f13093Dc2C497473CcA) | spend $SMILE to adopt |
+
+> **Retired: `ClaimPool` v1 at `0x02a6887730894E39B437eB0A4AB457d98167Fc0f`.**
+> The first pool had no idempotency guard on `recordBloom`, so a serial could burn the
+> Bloom Fee twice — and the backend's only defence, `yieldByCard > 0`, could never
+> catch a zero-happiness card, which would have been re-burned on every retry forever.
+> Since the ten-year calendar *is* `365,000 / 100`, each extra burn silently deletes a
+> day from the end of it. The replacement records the *event* in `bloomRecorded` rather
+> than inferring it from the size of the payout, and reverts on a repeat.
+>
+> Its `MINTER_ROLE` has been revoked, so it can no longer mint anything. Mochibo's
+> **760 $SMILE of yield remains stranded there** and was deliberately *not* re-recorded
+> against the new pool: doing so would have burned a second 100 for the same card,
+> which is precisely the fault being fixed. The Treasury has therefore burned exactly
+> 100 for exactly one bloom, which is the invariant that matters. The new pool starts
+> empty and accrues from bloom #2 onward.
+>
+> Only `ClaimPool` was replaced. `PixelSlimeCard` is untouched, because Mochibo's
+> anchor row points at it — replacing it would orphan the one card that exists.
 
 **Invariants read back off the live chain, not asserted from the source:**
 
