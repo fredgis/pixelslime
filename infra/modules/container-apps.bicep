@@ -90,6 +90,15 @@ param cardContractAddress string = ''
 param claimPoolAddress string = ''
 
 @description('''
+First serial belonging to the CURRENT ClaimPool.
+
+Replacing the pool resets every bloomRecorded flag, so a catch-up sweep would re-burn
+the fee for cards that already paid it into the retired pool. Raise this to the first
+serial of the new pool's epoch whenever the pool is replaced.
+''')
+param bloomMinSerial int = 1
+
+@description('''
 secp256k1 key that signs anchor and bloom transactions.
 
 Held here rather than in Key Vault because the KeyVault_PublicNetwork_Modify policy at
@@ -126,6 +135,10 @@ var chainEnvironmentVariables = empty(chainRpcUrl)
         {
           name: 'CLAIM_POOL_ADDRESS'
           value: claimPoolAddress
+        }
+        {
+          name: 'CHAIN_BLOOM_MIN_SERIAL'
+          value: string(bloomMinSerial)
         }
       ],
       empty(chainSignerKey)

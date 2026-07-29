@@ -68,6 +68,14 @@ class ChainSettings(BaseSettings):
         validation_alias="CLAIM_POOL_ADDRESS",
         description="Deployed ClaimPool address; recordBloom burns the fee and mints yield.",
     )
+    bloom_min_serial: int = Field(
+        default=1,
+        validation_alias="CHAIN_BLOOM_MIN_SERIAL",
+        description=(
+            "First serial belonging to the current ClaimPool. Raise it after replacing "
+            "the pool so a catch-up sweep cannot re-burn fees already paid to the old one."
+        ),
+    )
 
     # ── Raw-key signer, permitted on testnets only (see chain/signer.py) ────
     allow_local_signer: bool = Field(

@@ -314,6 +314,41 @@ async def test_a_failed_bloom_is_retried_on_the_next_run() -> None:
     assert recovering.calls == [(1, card.rarity, card.happiness)]
 
 
+@pytest.mark.asyncio
+async def test_a_serial_bloomed_against_a_retired_pool_is_not_bloomed_again() -> None:
+    # Replacing the ClaimPool resets every bloomRecorded flag, because the new pool has
+    # never seen any of them. A catch-up sweep would then walk the whole collection and
+    # re-burn the fee for cards that already paid it into the retired pool — the exact
+    # double-burn the replacement existed to prevent. The floor states where the new
+    # pool's history begins, so the two generations cannot overlap.
+    deps, _, _ = _seeded()
+    recorder = StubBloomRecorder()
+    deps = replace(deps, bloom=recorder, bloom_min_serial=2)
+
+    await anchor_serial(1, deps=deps)
+
+    assert recorder.calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_floor_does_not_block_later_serials() -> None:
+    db = FakeAsmDb(events=[])
+    card = build_card(serial=5, mint_day=5)
+    db.seed(card)
+    recorder = StubBloomRecorder()
+    deps = AnchorDependencies(
+        repository=FakeRepository(db),
+        writer=FakeRowWriter(db),
+        anchorer=StubAnchorer(),
+        bloom=recorder,
+        bloom_min_serial=2,
+    )
+
+    await anchor_serial(5, deps=deps)
+
+    assert recorder.calls == [(5, card.rarity, card.happiness)]
+
+
 def test_encode_is_importable() -> None:
     # Guards against the helper drifting away from the codec surface the job uses.
     assert callable(encode)

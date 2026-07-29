@@ -75,6 +75,15 @@ param cardContractAddress string = ''
 param claimPoolAddress string = ''
 
 @description('''
+First serial belonging to the CURRENT ClaimPool.
+
+Replacing the pool resets every bloomRecorded flag, so a catch-up sweep would re-burn
+the fee for cards that already paid it into the retired pool. Raise this whenever the
+pool is replaced. It is 2 today because PS-0001 bloomed against ClaimPool v1.
+''')
+param bloomMinSerial int = 1
+
+@description('''
 secp256k1 key signing anchor and bloom transactions.
 
 A Container Apps secret rather than Key Vault, because the KeyVault_PublicNetwork_Modify
@@ -203,6 +212,7 @@ module containerApps 'modules/container-apps.bicep' = {
     chainId: chainId
     cardContractAddress: cardContractAddress
     claimPoolAddress: claimPoolAddress
+    bloomMinSerial: bloomMinSerial
     chainSignerKey: chainSignerKey
     forceJobRun: forceJobRun
     storageAccountName: storageAccountName

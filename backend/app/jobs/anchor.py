@@ -91,6 +91,15 @@ class AnchorDependencies:
     anchorer: CardAnchorer
     bloom: BloomRecorder | None = None
     token_uri_base: str = DEFAULT_TOKEN_URI_BASE
+    bloom_min_serial: int = 1
+    """First serial whose bloom belongs to the *current* Claim Pool.
+
+    Replacing the pool resets every ``bloomRecorded`` flag, since the new contract has
+    no memory of the old one's history. A catch-up sweep would then walk the whole
+    collection and burn the Bloom Fee a second time for cards that already paid it into
+    the retired pool. Rather than teach the job about pool generations, this simply
+    states where the current pool's history starts.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +209,15 @@ def _record_bloom(deps: AnchorDependencies, card: Card) -> None:
     """
     if deps.bloom is None:
         return
+    if card.serial < deps.bloom_min_serial:
+        # Already bloomed against a previous Claim Pool. The current pool has no record
+        # of it and would happily burn the fee again.
+        _log.info(
+            "bloom_skipped_before_pool_epoch",
+            serial=card.serial,
+            min_serial=deps.bloom_min_serial,
+        )
+        return
     try:
         deps.bloom.record_bloom(card.serial, card.rarity, card.happiness)
     except Exception as exc:
@@ -295,6 +313,7 @@ async def _run(serials: list[int]) -> None:
             writer=asmdb,
             anchorer=anchorer,
             bloom=_build_bloom_recorder(chain_settings, anchorer),
+            bloom_min_serial=chain_settings.bloom_min_serial,
         )
         targets = serials or await repository.list_card_serials()
         for serial in targets:

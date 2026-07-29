@@ -13,8 +13,8 @@
 
 [![Live](https://img.shields.io/badge/live-www.pixelslime.cloud-7FE3C0?style=for-the-badge)](https://www.pixelslime.cloud)
 [![CI](https://img.shields.io/github/actions/workflow/status/fredgis/pixelslime/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/fredgis/pixelslime/actions/workflows/ci.yml)
-[![Chain](https://img.shields.io/badge/chain-Polygon%20Amoy%20·%2080002-8B6FE8?style=for-the-badge)](https://amoy.polygonscan.com/)
-[![Tests](https://img.shields.io/badge/tests-726%20backend%20·%2049%20chain-FFD86B?style=for-the-badge)](#-verified-not-asserted)
+[![Chain](https://img.shields.io/badge/chain-Polygon%20Amoy%20%C2%B7%2080002-8B6FE8?style=for-the-badge)](https://amoy.polygonscan.com/)
+[![Tests](https://img.shields.io/badge/tests-726%20backend%20%C2%B7%2049%20chain-FFD86B?style=for-the-badge)](#-verified-not-asserted)
 
 </div>
 
