@@ -344,7 +344,12 @@ resource api 'Microsoft.App/containerApps@2025-07-01' = {
         }
       ]
       scale: {
-        minReplicas: 0
+        // 1, not 0. Scale-to-zero made the first visit after ~5 idle minutes cost
+        // 29 seconds: ~13s to schedule and create the sandbox, 5s to pull the image,
+        // and only 1.3s of that was the application actually starting. The site is
+        // visited a handful of times a day, so every one of those visits was a cold
+        // start. Measured after the change: 261 ms.
+        minReplicas: 1
         maxReplicas: 3
       }
     }

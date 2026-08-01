@@ -23,6 +23,20 @@
 
 ## 1. Current state and safety rules
 
+> **Placeholders.** This repository is public, so tenant-specific values are written as
+> `<SUBSCRIPTION_ID>`, `<TENANT_ID>` and `<ASMDB_INSTANCE>`. Recover the real ones from the
+> live environment rather than guessing:
+>
+> ```powershell
+> az account show --query "{sub:id, tenant:tenantId}" -o json
+> az containerapp show -n ca-pixelslime-api -g FGI-ASMDBPIXELSMILES `
+>   --query "properties.template.containers[0].env[?name=='ASMDB_INSTANCE'].value" -o tsv
+> ```
+>
+> `deploy.ps1` takes `-SubscriptionId` and `-AsmdbInstance` as **mandatory** parameters. That is
+> deliberate: a default placeholder would deploy successfully and leave the app talking to a
+> database that does not exist.
+
 | | Live value |
 |---|---|
 | Subscription | `<SUBSCRIPTION_ID>` |
@@ -35,7 +49,7 @@
 | Anchor job | `caj-pixelslime-anchor` — `30 8,9 * * *` UTC |
 | Registry | `crpixelslimededh2k35j5.azurecr.io` |
 | Managed identity | `id-pixelslime` |
-| Active image | API, daily and anchor all use `pixelslime:v11` |
+| Active image | API, daily and anchor all use `pixelslime:v20` |
 | asmDB | `https://www.asmdb.cloud` · instance `<ASMDB_INSTANCE>` |
 | Chain | Polygon Amoy · chain id `80002` |
 | Live health | `{"status":"ok","cards":1,"engine":"1.7.0"}` |
@@ -338,7 +352,8 @@ live-safe invocation shape is:
 
 ```powershell
 Set-Location <repo>
-.\infra\deploy.ps1 -ContainerImageTag $Tag -DeployPlaceholderImage:$false
+.\infra\deploy.ps1 -ContainerImageTag $Tag -DeployPlaceholderImage:$false `
+  -SubscriptionId <SUBSCRIPTION_ID> -AsmdbInstance <ASMDB_INSTANCE>
 ```
 
 > ⚠️ **This is not currently a complete reconstruction of the live estate.**
