@@ -9,7 +9,7 @@ import pytest
 
 from app.asmdb import AsmDbClient
 
-LIVE_BASE_URL = "https://www.asmdb.cloud/db/<ASMDB_INSTANCE>"
+LIVE_BASE_URL = f"https://www.asmdb.cloud/db/{os.getenv('ASMDB_INSTANCE', '')}"
 RUN_LIVE_HEALTH = os.getenv("ASMDB_RUN_LIVE_HEALTH") == "1"
 TOKEN_PRESENT = bool(os.getenv("ASMDB_BEARER_TOKEN"))
 

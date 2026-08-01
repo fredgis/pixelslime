@@ -32,8 +32,8 @@ param adminToken string = ''
 @description('Scheme and host of the asmDB service.')
 param asmdbBaseUrl string = 'https://www.asmdb.cloud'
 
-@description('The 24-character asmDB instance suffix — the database this app reads and writes.')
-param asmdbInstance string = '<ASMDB_INSTANCE>'
+@description('The 24-character asmDB instance suffix — the database this app reads and writes. Required: there is no sensible default, and a placeholder would deploy an app that silently talks to nothing.')
+param asmdbInstance string
 
 @description('''
 Which job the scheduled container runs. Normally 'daily'.

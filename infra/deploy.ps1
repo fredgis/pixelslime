@@ -3,8 +3,16 @@ param(
     [Parameter()]
     [string] $ResourceGroup = 'FGI-ASMDBPIXELSMILES',
 
-    [Parameter()]
-    [string] $SubscriptionId = '<SUBSCRIPTION_ID>',
+    # No default: this repository is public, so the subscription is supplied by the
+    # operator rather than baked in. A placeholder default would fail late and
+    # confusingly; a mandatory parameter fails immediately and says why.
+    [Parameter(Mandatory)]
+    [string] $SubscriptionId,
+
+    # Likewise the asmDB instance. Passing a wrong one deploys an app that starts
+    # cleanly and then talks to a database that does not exist.
+    [Parameter(Mandatory)]
+    [string] $AsmdbInstance,
 
     [Parameter()]
     [string] $Location,
@@ -36,6 +44,7 @@ if ($LASTEXITCODE -ne 0) {
 $parameters = @(
     "containerImageTag=$ContainerImageTag"
     "deployPlaceholderImage=$($DeployPlaceholderImage.ToString().ToLowerInvariant())"
+    "asmdbInstance=$AsmdbInstance"
 )
 if ($Location) {
     $parameters += "location=$Location"
