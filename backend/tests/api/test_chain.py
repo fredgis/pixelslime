@@ -201,3 +201,66 @@ async def test_startup_sweep_is_capped_so_a_large_unanchored_tail_cannot_stall_b
         source.add_anchor(anchor_for(serial))
 
     assert await index.refresh_unanchored(source, limit=2) == 2
+
+
+async def test_a_card_anchored_after_boot_is_surfaced_without_a_restart() -> None:
+    # The real sequence, and the one that broke production: a long-running replica
+    # picks up tomorrow's card through the periodic reconcile, the anchor job writes
+    # its part-8 row half an hour later, and nothing ever re-reads it. The card then
+    # shows ANCHOR PENDING until someone happens to restart the app -- which is how
+    # PS-0005 and PS-0006 sat pending for days while provably on-chain.
+    #
+    # refresh_pending_anchors cannot close this: it polls only cards whose header
+    # flags.on_chain is set, and that bit is written at creation, before any anchor
+    # exists. It is false on every card ever minted, so that sweep polls nothing.
+    source = InMemoryCardSource()
+    index = CardIndex()
+    await index.reconcile(source)
+
+    # A new card blooms after boot and is folded in with no anchor yet.
+    source.add_card(build_card(7))
+    await index.reconcile(source)
+    assert index.chain_for(7) is None
+
+    # The anchor job lands its row later.
+    source.add_anchor(anchor_for(7))
+
+    # The flag-bounded sweep is blind to it, by design.
+    assert await index.refresh_pending_anchors(source) == 0
+    assert index.chain_for(7) is None
+
+    # The evidence-based sweep is what the periodic loop must call.
+    assert await index.refresh_unanchored(source) == 1
+    assert index.chain_for(7) is not None
+
+
+async def test_the_periodic_loop_surfaces_an_anchor_written_after_boot() -> None:
+    # The test above pins the index methods; this one pins the *caller*, which is where
+    # the defect actually lived. bootstrap_index swept correctly while _reconcile_loop
+    # kept calling the flag-bounded version, so a card anchored after boot stayed
+    # pending until a restart. Nothing tested the loop, which is why it went unnoticed.
+    import asyncio
+
+    from app.core.config import Settings
+    from app.main import _reconcile_loop
+    from app.storage.blob import InMemoryBlobStore
+
+    source = InMemoryCardSource()
+    source.add_card(build_card(9))
+    index = CardIndex()
+    await index.reconcile(source)
+    assert index.chain_for(9) is None
+
+    source.add_anchor(anchor_for(9))
+
+    settings = Settings(INDEX_REFRESH_SECONDS=0.01)
+    stop = asyncio.Event()
+    task = asyncio.create_task(_reconcile_loop(settings, source, InMemoryBlobStore(), index, stop))
+    for _ in range(200):
+        await asyncio.sleep(0.01)
+        if index.chain_for(9) is not None:
+            break
+    stop.set()
+    await task
+
+    assert index.chain_for(9) is not None, "the periodic loop never re-read the anchor"

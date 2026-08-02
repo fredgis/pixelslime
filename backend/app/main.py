@@ -124,7 +124,14 @@ async def _reconcile_loop(
             health = await source.health()
             index.engine = health.engine
             await index.reconcile(source)
-            await index.refresh_pending_anchors(source)
+            # refresh_unanchored, not refresh_pending_anchors. The latter polls only
+            # cards whose header flags.on_chain is set, and that bit is written when the
+            # card is created — before any anchor exists — so it is false on every card
+            # and that sweep polls nothing at all. Anchoring lands roughly half an hour
+            # after the bloom, long after this loop has already folded the card in, so
+            # the anchor must be re-read from the evidence rather than predicted from a
+            # flag. Without this a card stays ANCHOR PENDING until someone restarts.
+            await index.refresh_unanchored(source)
             index.degraded = False
             await blob.save_index(index.to_json_bytes())
         except (AsmDbError, OSError, ValueError) as exc:
