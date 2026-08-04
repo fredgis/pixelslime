@@ -41,7 +41,7 @@ _ANCHOR_PART = 8
 #: pointing at ``https://pixelslime.cloud/api/cards/1`` — wrong on both counts — and a
 #: tokenURI cannot be rewritten after the mint, so that one card is permanently
 #: mis-addressed. Everything after it is not.
-DEFAULT_TOKEN_URI_BASE = "https://www.pixelslime.cloud/api/nft/"
+DEFAULT_TOKEN_URI_BASE = "https://www.pixelslime.cloud/api/nft/"  # noqa: S105 - a public URL; flagged only because the name contains "TOKEN"
 
 
 class CardAnchorer(Protocol):

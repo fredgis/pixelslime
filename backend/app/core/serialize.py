@@ -145,7 +145,7 @@ def raw_view(card: Card, *, chain: ChainAnchor | None = None) -> dict[str, Any]:
 
 
 #: Hosts where an http:// base URL is genuinely http and must be left alone.
-_LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "testserver")
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "testserver")  # noqa: S104 - hostnames matched against, not a bind address
 
 
 def _public_base(base_url: str) -> str:

@@ -14,8 +14,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from _jobs_helpers import FakeAsmDb, build_card
+
 from app.asmdb import AsmDbNotFound
 from app.chain import AnchorReceipt, AnchorResult, decode_anchor_row
 from app.codec import card_hash, encode

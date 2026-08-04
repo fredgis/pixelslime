@@ -25,6 +25,11 @@ import { mockCardSvg, svgDataUri, pseudoArtId, type MockAccessory, type MockFace
  * Typing the seeds against these unions makes any name that is NOT in the frozen table
  * a compile error, so the mock cannot silently drift from the contract.
  */
+/* eslint-disable @typescript-eslint/no-unused-vars --
+   These three exist only to derive the unions below with `(typeof X)[number]`. Their
+   values are never read at runtime, which a non-type-aware lint reports as unused;
+   deleting them would delete the types. Keeping the frozen table as a value is the
+   point: it is what makes a name outside it a compile error. */
 const BIOMES = [
   'Open Meadow', 'Sunlit Forest', 'Tide Pool Cove', 'Cozy Bedroom', 'Cozy Reading Room',
   'Rainy Street', 'Cluttered Workshop', 'Library at Dusk', 'Mushroom Grove', 'Snowy Village',
@@ -43,6 +48,7 @@ const COMPANIONS = [
 type Biome = (typeof BIOMES)[number];
 type Mood = (typeof MOODS)[number];
 type Companion = (typeof COMPANIONS)[number];
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * Serials still awaiting on-chain anchoring: their `chain` is `null` and `onChain` is

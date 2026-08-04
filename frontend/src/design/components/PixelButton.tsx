@@ -50,7 +50,6 @@ export function PixelButton({
     .join(' ');
 
   return (
-    // eslint-disable-next-line react/button-has-type -- `type` is defaulted above
     <button
       className={classes}
       style={{ background: bg, color: readableText(bg, color.ink, color.paper), ...style }}

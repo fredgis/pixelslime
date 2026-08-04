@@ -29,7 +29,6 @@ from app.asmdb import AsmDbError
 from app.codec import RARITIES, TYPES, Card, CodecError
 
 from .chain import ChainAnchor, chain_from_storage_dict, chain_storage_dict
-from .logging import get_logger
 from .economy import (
     BLOOM_FEE,
     GENESIS_RAIN_TOTAL,
@@ -38,6 +37,7 @@ from .economy import (
     genesis_remaining,
     smile_yield,
 )
+from .logging import get_logger
 from .source import CardSource
 from .time import mint_date, paris_today, yyyymmdd
 
@@ -214,9 +214,9 @@ class CardIndex:
         where the cost is paid once, and it is capped so that a long unanchored tail
         can never stall a boot. Returns the number newly anchored on this pass.
         """
-        unanchored = [
-            serial for serial, entry in self._by_serial.items() if entry.chain is None
-        ][:limit]
+        unanchored = [serial for serial, entry in self._by_serial.items() if entry.chain is None][
+            :limit
+        ]
         updated = 0
         for serial in unanchored:
             await self.refresh_chain(source, serial)

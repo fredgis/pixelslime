@@ -57,6 +57,15 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
+# `app` has no __init__.py, so it is a namespace package. Installing the project
+# editable also puts `backend/` on sys.path, and mypy then reaches app/codec/ by two
+# routes at once - as `codec` (walking up from the file until an __init__.py stops it)
+# and as `app.codec` (via the path entry) - and refuses to run at all with "Source file
+# found twice under different module names". Pinning the package root to `backend/`
+# leaves exactly one answer. Without this, `mypy app` fails before type-checking
+# anything, which is why this gate silently never ran.
+explicit_package_bases = true
+mypy_path = "."
 
 [[tool.mypy.overrides]]
 module = ["web3.*", "eth_account.*", "eth_keys.*", "eth_utils.*"]

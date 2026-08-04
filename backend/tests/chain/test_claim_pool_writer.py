@@ -66,11 +66,11 @@ class _FakeContractFunction:
 
 
 class _FakeFunctions:
-    def recordBloom(self, *args: object) -> _FakeContractFunction:  # noqa: N802
+    def recordBloom(self, *args: object) -> _FakeContractFunction:
         del args
         return _FakeContractFunction()
 
-    def bloomRecorded(self, serial: int) -> object:  # noqa: N802
+    def bloomRecorded(self, serial: int) -> object:
         del serial
         return _FakeCall(False)
 
@@ -124,4 +124,3 @@ def test_the_sender_is_stripped_before_signing() -> None:
     assert "from" not in signer.seen
     assert signer.seen["nonce"] == 7
     assert signer.seen["chainId"] == 80002
-
