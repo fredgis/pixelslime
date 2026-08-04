@@ -44,8 +44,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 # image: the layer stays cacheable and the build does not depend on a TOML parser
 # or a heredoc surviving. scripts/sync_requirements.py keeps the two in step and
 # CI runs it with --check.
-COPY backend/requirements.txt ./
-RUN pip install -r requirements.txt
+#
+# constraints.txt pins the full transitive graph, so rebuilding an old commit gives
+# the same dependencies it was tested with instead of whatever PyPI serves today.
+# requirements.txt keeps the `>=` floors because it documents intent; the constraint
+# file is what makes the build reproducible.
+COPY backend/requirements.txt backend/constraints.txt ./
+RUN pip install -r requirements.txt -c constraints.txt
 
 
 # ── stage 3: runtime ──────────────────────────────────────────────────────────
