@@ -175,7 +175,7 @@ Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`
 | **`infra/`** | Bicep — identity, Key Vault, Storage, ACR, Container Apps, VNet, RBAC |
 | **`assets/`** | The pinned DEFLATE dictionary (`psdict_v1.bin`) and the Mochibo style template |
 | **`scripts/`** | Contract validation, row verification, dictionary build, template cleanup |
-| **`docs/`** | Architecture, data path, plain-language, codec spec, plan, runbook, agents + the mockup |
+| **`docs/`** | Architecture, data path, plain-language, codec spec, plan, runbook, security audit, agents + the mockup |
 | **`Dockerfile`** | One image, two entrypoints: the API and the daily job |
 
 ---
@@ -190,6 +190,7 @@ Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`
 | **[`docs/CODEC.md`](docs/CODEC.md)** | Codec implementers — the normative PSC-1 specification |
 | **[`docs/PLAN.md`](docs/PLAN.md)** | Anyone who wants the full reasoning — product, architecture, economy, the agent split |
 | **[`docs/RUNBOOK.md`](docs/RUNBOOK.md)** | Whoever ships it — rollout, backfill, token rotation, troubleshooting |
+| **[`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md)** | Anyone assessing the risk — OWASP review of the web app, infrastructure and contracts, open findings included |
 | **[`docs/AGENTS.md`](docs/AGENTS.md)** | Contributors — how work is split across parallel workstreams |
 
 ---
