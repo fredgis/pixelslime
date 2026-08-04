@@ -1,9 +1,25 @@
 name: CI
 
 on:
+  # Documentation-only changes do not need a Python matrix, an npm install and a
+  # full container build. Without these filters a one-line README edit spends the
+  # same runner minutes as a change to the signing path, which is how a repository
+  # ends up paying for CI it gets no signal from. A commit touching both code and
+  # docs still runs everything, because paths-ignore only skips a run when *every*
+  # changed file matches.
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
 
 jobs:
   contracts:
