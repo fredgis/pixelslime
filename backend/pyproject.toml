@@ -68,7 +68,19 @@ explicit_package_bases = true
 mypy_path = "."
 
 [[tool.mypy.overrides]]
-module = ["web3.*", "eth_account.*", "eth_keys.*", "eth_utils.*"]
+# The chain stack ships no type information. `eth_typing` and `azure.keyvault.keys`
+# belong here for the same reason as the rest: CI installs only the `dev` extra, not
+# `chain`, so app/chain/signer.py is type-checked against modules that are either
+# absent or present without a py.typed marker. Listing them keeps the gate honest
+# about our own code rather than red about someone else's packaging.
+module = [
+    "web3.*",
+    "eth_account.*",
+    "eth_keys.*",
+    "eth_utils.*",
+    "eth_typing.*",
+    "azure.keyvault.keys.*",
+]
 ignore_missing_imports = true
 implicit_reexport = true
 

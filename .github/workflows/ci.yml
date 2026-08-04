@@ -42,7 +42,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -e ".[dev]"
+      # `chain` is not optional for CI despite the name: tests/chain and tests/jobs
+      # import web3 and eth_keys at collection time, so installing only `dev` fails
+      # the whole run before a single test executes.
+      - run: pip install -e ".[dev,chain]"
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy app
