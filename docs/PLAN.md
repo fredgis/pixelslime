@@ -935,7 +935,7 @@ The lore does the explaining, and the mechanics follow it exactly:
 
 ```mermaid
 flowchart TD
-    G["<b>🌧️ GENESIS RAIN</b><br/>365,000 SMILE minted once at deployment<br/>held by the Treasury, a Key Vault key<br/><b><i>FINITE — the minter role is renounced,<br/>so it can never be refilled</i></b>"]
+    G["<b>🌧️ GENESIS RAIN</b><br/>365,000 SMILE minted once at deployment<br/>held by the Treasury, a Key Vault key<br/><b><i>The Treasury renounced its minter role,<br/>so this purse only ever shrinks</i></b>"]
     BLOOM(["🫧 <b>A slime blooms</b><br/>every day at 10:00 Paris"])
     FEE["<b>BLOOM FEE — 100 SMILE</b><br/>paid by the Treasury"]
     BURN1["🔥 <b>BURNED</b><br/>destroyed forever<br/><i>the Treasury genuinely shrinks:<br/>3,650 blooms and the puddle is dry</i>"]
@@ -1099,10 +1099,19 @@ here because the plan as originally written permitted every one of them.
 
 **1. `admin == treasury` would have made the burn theatre.** §8 gave the Treasury both the Genesis Rain
 *and* the contracts' admin role. An admin can `grantRole(MINTER_ROLE, self)` — so the Treasury could
-simply mint itself a fresh puddle, and *"the Rain can never be refilled"* would have been a sentence
-rather than a guarantee. **The admin key and the Treasury key must be distinct**, this is now enforced
-in the constructor and re-checked at deploy time, and it is a hard requirement on whoever runs the
-deployment. This was the most valuable finding of the whole build.
+simply mint itself a fresh puddle, and the separation between the paying purse and the earning purse
+would have been a sentence rather than a guarantee. **The admin key and the Treasury key must be
+distinct**, this is now enforced in the constructor and re-checked at deploy time, and it is a hard
+requirement on whoever runs the deployment. This was the most valuable finding of the whole build.
+
+> **Correction (security review, Aug 2026).** The paragraph above stops one step short of its own
+> reasoning. Separating `admin` from `treasury` stops the *Treasury* from refilling the Rain, and that
+> part holds. It does not cap the supply: `MINTER_ROLE` is administered by `DEFAULT_ADMIN_ROLE`, so the
+> admin can still grant minting rights to any address, itself included. Everywhere this document or the
+> UI said the Rain "can never be refilled", the honest claim is narrower — *the Treasury* can never
+> refill it, and the Treasury's balance only ever shrinks. A real supply cap needs the admin to renounce
+> `DEFAULT_ADMIN_ROLE`, which is irreversible and therefore a deliberate governance decision, not a
+> deployment step. Verify the current state on-chain rather than trusting this file.
 
 **2. A leaked claim voucher would have been redeemable forever.** §8.4 specified the voucher as
 `(wallet, serial, amount, nonce)` with no expiry and no way to rotate one out. The tuple is now

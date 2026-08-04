@@ -24,7 +24,7 @@ const GENESIS_TOTAL = 365_000;
 const TOTAL_BLOOMS = 3_650;
 
 const FLOW: ReadonlyArray<{ icon: string; title: string; body: string; color: string }> = [
-  { icon: '🌧️', title: 'GENESIS RAIN', body: '365,000 $SMILE minted once at deployment. Finite — the minter role is renounced, so it can never be refilled.', color: tokens.color.sunbeam },
+  { icon: '🌧️', title: 'GENESIS RAIN', body: '365,000 $SMILE minted once at deployment. The Treasury gave up its minter role for good, so this purse only ever shrinks.', color: tokens.color.sunbeam },
   { icon: '🔥', title: 'BLOOM BURN', body: 'Every bloom the Treasury pays a 100 $SMILE fee — and it is burned forever. The puddle only ever shrinks.', color: tokens.color.coral },
   { icon: '💧', title: 'CLAIM POOL', body: 'Each slime mints ~248 $SMILE of fresh happiness into a pool the Treasury cannot touch.', color: tokens.color.sky },
   { icon: '🧑‍🌾', title: 'ADOPT', body: 'Keepers claim $SMILE with an EIP-712 voucher, then spend it to adopt a slime out of the Vault.', color: tokens.color.mint },

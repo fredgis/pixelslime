@@ -8,8 +8,20 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 /// @title SmileToken — the $SMILE ERC-20 (the "Genesis Rain").
 /// @notice The economic heart of PIXELSLIME (`docs/PLAN.md` §8.3). Exactly
 ///         `GENESIS_RAIN` tokens are minted **once** to the Treasury at
-///         construction; the Treasury's ability to mint is then removed, so the
-///         puddle is finite and provably cannot be refilled.
+///         construction, and the Treasury's ability to mint is then removed for
+///         good: `admin != treasury_` is enforced below, so no governance path
+///         reachable by the Treasury can give it back. That much is a property of
+///         this code.
+///
+///         What is **not** guaranteed by this code is the total supply. `MINTER_ROLE`
+///         is administered by `DEFAULT_ADMIN_ROLE`, so the admin may grant minting
+///         rights to any address — including itself — at any time. The 365,000 cap
+///         is therefore a governance commitment, not a mathematical one, and any
+///         claim that the puddle "provably cannot be refilled" would be false while
+///         a live `DEFAULT_ADMIN_ROLE` holder exists. Making the cap real requires
+///         renouncing that role, which is irreversible and hence a deliberate
+///         decision rather than a deployment step; until then, treat the supply as
+///         capped by policy and verify it on-chain rather than trusting this comment.
 ///
 ///         The two halves of the economy are kept on different purses on purpose:
 ///         the Treasury only ever *burns* (its balance is monotonically
@@ -20,7 +32,10 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 contract SmileToken is ERC20, ERC20Burnable, AccessControl {
     /// @notice Holders of this role may mint new $SMILE. Granted post-deployment
     ///         to the {ClaimPool} only; the Treasury is deliberately never a member
-    ///         after the constructor returns.
+    ///         after the constructor returns. Note this is not a closed set: the
+    ///         `DEFAULT_ADMIN_ROLE` holder can add members, so "the ClaimPool is the
+    ///         only minter" is a statement about the current on-chain state, to be
+    ///         checked with `getRoleMemberCount`, not an invariant of this contract.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The one and only decreed supply: 365,000 $SMILE (18 decimals).
@@ -44,7 +59,10 @@ contract SmileToken is ERC20, ERC20Burnable, AccessControl {
     /// @param admin The governance address that administers roles (the PARAMS
     ///        holder of §8.5). It MUST differ from `treasury_`: were the Treasury
     ///        its own admin it could re-grant itself `MINTER_ROLE`, and the
-    ///        "cannot be refilled" guarantee would be a fiction rather than a fact.
+    ///        separation between the burning purse and the minting purse would be
+    ///        a fiction rather than a fact. Note this check constrains the
+    ///        *Treasury* only — `admin` itself retains the power to grant
+    ///        `MINTER_ROLE` to anyone, so choose it accordingly.
     constructor(address treasury_, address admin) ERC20("PixelSlime Smile", "SMILE") {
         if (treasury_ == address(0) || admin == address(0)) {
             revert ZeroAddress();
@@ -66,8 +84,9 @@ contract SmileToken is ERC20, ERC20Burnable, AccessControl {
     }
 
     /// @notice Mint new $SMILE. Restricted to `MINTER_ROLE` (the {ClaimPool}).
-    /// @dev This is the only inflation path. The Treasury is not a minter, so it
-    ///      cannot use this to refill the puddle — see the constructor.
+    /// @dev This is the only inflation path, and the Treasury cannot reach it —
+    ///      see the constructor. It is not, however, a supply cap: whoever holds
+    ///      `DEFAULT_ADMIN_ROLE` can grant `MINTER_ROLE` and mint without limit.
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
