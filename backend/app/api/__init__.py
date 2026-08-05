@@ -9,11 +9,16 @@ from __future__ import annotations
 
 from . import routes_cards, routes_media, routes_meta
 from .errors import ApiError, install_error_handlers
-from .middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+from .middleware import (
+    CacheControlMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from .spa import mount_spa
 
 __all__ = [
     "ApiError",
+    "CacheControlMiddleware",
     "RateLimitMiddleware",
     "SecurityHeadersMiddleware",
     "install_error_handlers",

@@ -18,6 +18,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from app.api import (
+    CacheControlMiddleware,
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
     install_error_handlers,
@@ -224,6 +225,7 @@ def create_app(
         trust_forwarded_for=settings.trust_forwarded_for,
     )
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(CacheControlMiddleware)
 
     mount_spa(app, _resolve_dist(settings))
     return app

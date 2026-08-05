@@ -43,6 +43,63 @@ _SECURITY_HEADERS = {
     "Content-Security-Policy": CONTENT_SECURITY_POLICY,
 }
 
+#: One year. Only ever applied to responses whose URL changes when the bytes change.
+_IMMUTABLE = "public, max-age=31536000, immutable"
+
+#: Suffixes of the media routes. A card is minted once and its hash is committed
+#: on-chain, so the pixels behind these URLs can never change - which makes them the
+#: one part of ``/api`` that is safe, and very much worth, caching hard.
+_MEDIA_SUFFIXES = ("/image", "/thumb")
+
+
+def _cache_control_for(path: str) -> str:
+    """Decide the caching rule for a path.
+
+    Serving nothing at all was the previous policy, and it inverted every case that
+    matters. With no directive a cache may store a response and reuse it on its own
+    terms, so ``/api/cards/today`` - the one payload that is different tomorrow - was
+    the thing most likely to be served stale, while the hashed bundles that *can* be
+    kept for a year were being re-validated every few hours. This function states the
+    intent explicitly instead of leaving it to heuristics.
+    """
+    if path.startswith("/assets/") or path.endswith(_MEDIA_SUFFIXES):
+        return _IMMUTABLE
+    if path.startswith("/api/"):
+        # Daily data. ``no-store`` rather than ``no-cache`` because these responses
+        # carry no validator, so a revalidation would be a full refetch anyway, and
+        # because a shared proxy holding yesterday's card is the exact failure this
+        # replaces.
+        return "no-store"
+    # index.html and every SPA route that falls back to it. It is small, it has an
+    # ETag, and it names the hashed bundles - so it must be checked every time or a
+    # visitor can keep booting a build that no longer exists.
+    return "no-cache"
+
+
+class CacheControlMiddleware:
+    """Give every response an explicit caching rule.
+
+    ``setdefault`` rather than assignment: a route that has thought about its own
+    caching keeps its answer, and this only fills the silence.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        directive = _cache_control_for(scope.get("path", ""))
+
+        async def send_with_cache(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message).setdefault("Cache-Control", directive)
+            await send(message)
+
+        await self.app(scope, receive, send_with_cache)
+
 
 class SecurityHeadersMiddleware:
     """Attach a fixed set of security headers to every HTTP response."""

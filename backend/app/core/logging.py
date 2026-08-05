@@ -32,6 +32,19 @@ def configure_logging(level: str = "INFO") -> None:
     numeric_level = logging.getLevelNamesMapping().get(level.upper(), logging.INFO)
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=numeric_level)
 
+    # The Azure SDK's HTTP logging policy writes one line per request header at INFO,
+    # so a single card image - which reads a blob - produced roughly thirty lines of
+    # redacted header dump. That is paid for twice: once at Log Analytics ingestion,
+    # and once when an incident has to be read through it. The transport is not the
+    # story we keep logs for; our own events are. Warnings and errors still come
+    # through, so a genuine storage failure is not silenced.
+    for noisy in (
+        "azure.core.pipeline.policies.http_logging_policy",
+        "azure.identity",
+        "azure.storage",
+    ):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
