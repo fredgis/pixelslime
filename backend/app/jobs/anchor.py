@@ -26,6 +26,7 @@ from app.codec import Card, card_hash, decode
 from app.core.logging import card_context, get_logger
 
 from ._operations import to_asmdb_rows, to_codec_rows
+from .errors import JobError
 from .models import JobRepository
 
 _log = get_logger(__name__)
@@ -289,6 +290,39 @@ def _build_bloom_recorder(settings: ChainSettings, anchorer: CardAnchorer) -> Bl
     )
 
 
+def _log_gas_balance(anchorer: CardAnchorer, *, runway_warn: int = 20) -> None:
+    """Report the signer's native balance, and warn before it runs out.
+
+    Anchoring stops dead when this wallet empties, and it does so quietly: the
+    transaction is rejected by the node, so nothing is mined and the only trace is a
+    per-serial warning. PS-0012 was missed exactly this way, with the balance 0.0002 POL
+    short of a single anchor - a state that had been approaching for days and that
+    nobody could see, because no run ever reported how much was left.
+
+    Logged every run so the number is in the history, and raised to a warning once the
+    remaining runway is short enough that topping up becomes urgent. Best-effort: a
+    monitoring read must never be the reason a sweep does not happen, so any failure
+    here is noted and stepped over.
+    """
+    try:
+        wei = anchorer.gas_balance_wei  # type: ignore[attr-defined]
+    except Exception as exc:  # pragma: no cover - depends on a live node
+        _log.warning("gas_balance_unavailable", error=str(exc))
+        return
+
+    native = wei / 1e18
+    # Measured from the real Amoy runs: an anchor plus its bloom record.
+    anchors_left = int(native // 0.0075)
+    fields = {
+        "balance": round(native, 6),
+        "anchors_left": anchors_left,
+    }
+    if anchors_left <= runway_warn:
+        _log.warning("gas_balance_low", **fields)
+    else:
+        _log.info("gas_balance", **fields)
+
+
 async def _run(serials: list[int]) -> None:
     """Anchor each serial in turn, against the real asmDB and the real chain."""
     from app.asmdb import AsmDbClient, AsmDbRepository
@@ -316,6 +350,8 @@ async def _run(serials: list[int]) -> None:
             bloom_min_serial=chain_settings.bloom_min_serial,
         )
         targets = serials or await repository.list_card_serials()
+        _log_gas_balance(anchorer)
+        failures: list[int] = []
         for serial in targets:
             try:
                 outcome = await anchor_serial(serial, deps=deps)
@@ -323,12 +359,29 @@ async def _run(serials: list[int]) -> None:
                 # One bad serial must not abandon the rest: a catch-up run exists
                 # precisely to make progress through a backlog.
                 _log.warning("anchor_failed", serial=serial, error=str(exc))
+                failures.append(serial)
                 continue
             _log.info(
                 "anchor_outcome",
                 serial=outcome.serial,
                 anchored=outcome.anchored,
                 tx=outcome.tx_hash.hex() if outcome.tx_hash else None,
+            )
+
+        # Swallowing every failure made the job report Succeeded while nothing had been
+        # anchored, which is how a drained gas wallet went unnoticed for a day: the
+        # execution history looked identical to a healthy run, so the only signal left
+        # was a visitor noticing a card stuck on ANCHOR PENDING. Tolerating one awkward
+        # serial is right; reporting success when the run accomplished nothing is not.
+        if failures:
+            _log.error(
+                "anchor_sweep_incomplete",
+                failed=failures,
+                failed_count=len(failures),
+                attempted=len(targets),
+            )
+            raise JobError(
+                f"{len(failures)} of {len(targets)} serials failed to anchor: {failures}"
             )
     finally:
         await asmdb.aclose()

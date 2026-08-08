@@ -118,6 +118,19 @@ class Anchorer:
         self._gas_limit = gas_limit
         self._contract = web3.eth.contract(address=card_address, abi=abi or CARD_ABI)
 
+    @property
+    def gas_balance_wei(self) -> int:
+        """Native balance of the account that pays for every anchor.
+
+        Exposed because when this reaches zero anchoring stops, and it stops quietly:
+        the node rejects the transaction, so there is no receipt to inspect and nothing
+        on-chain to notice. A caller that can read this can warn before that happens
+        instead of after. Kept as a property on the class that already holds both the
+        node and the signer, rather than having callers reach for private attributes.
+        """
+        balance: int = self._web3.eth.get_balance(self._signer.address)
+        return balance
+
     def is_minted(self, serial: int) -> bool:
         """True when the contract already stores a non-zero ``cardHash`` for ``serial``."""
         existing = self._contract.functions.cardHash(serial).call()
