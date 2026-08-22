@@ -73,6 +73,14 @@ Every card exposes its own **provenance**: the literal Z85 bytes exactly as they
   <img src="docs/assets/profile.png" alt="Slime Profile — stats, lore and the 175 packed bytes" width="740">
 </div>
 
+<div align="center">
+  <img src="docs/assets/slimedex-gallery.png" alt="PixelSlime SLIMEDEX gallery" width="900">
+</div>
+
+<div align="center">
+  <img src="docs/assets/slime-profile-detail.png" alt="PixelSlime card profile and SMILE yield" width="900">
+</div>
+
 ---
 
 ## Meet PixelSlime POD
