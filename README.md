@@ -78,7 +78,7 @@ Every card exposes its own **provenance**: the literal Z85 bytes exactly as they
 ## Meet PixelSlime POD
 
 <div align="center">
-  <img src="docs/assets/pixelslime-pod/pixelslime-real-enclosure.png" alt="PixelSlime POD physical display" width="760">
+  <img src="docs/assets/pixelslime-pod/pixelslime-pod-product-hero.png" alt="PixelSlime POD physical display and hardware overview" width="100%">
 </div>
 
 **PixelSlime POD** brings the daily bloom out of the browser and onto a small desk device. It uses a
