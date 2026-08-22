@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1800" height="950" viewBox="0 0 1800 950">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#17102d"/><stop offset="1" stop-color="#402060"/></linearGradient>
+    <linearGradient id="ready" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#56328f"/><stop offset="1" stop-color="#d03c8b"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity=".25"/></filter>
+    <clipPath id="card3"><rect x="23" y="25" width="319" height="478" rx="10"/></clipPath>
+    <clipPath id="card4"><rect x="22" y="25" width="296" height="478" rx="10"/></clipPath>
+    <style>
+      .title{font-family:Arial,sans-serif;font-weight:700;fill:#17191d}
+      .screenTitle{font-family:Consolas,monospace;font-weight:700;fill:#fff}
+      .copy{font-family:Arial,sans-serif;fill:#fff}
+      .caption{font-family:Arial,sans-serif;fill:#3e4249}
+    </style>
+  </defs>
+  <rect width="1800" height="950" fill="#f1f2f4"/>
+  <text x="70" y="65" class="title" font-size="38">PixelSlime POD: daily flow</text>
+  <text x="72" y="103" class="caption" font-size="20">Four interface states designed for the 320 × 480 display</text>
+
+  <g transform="translate(55 150)" filter="url(#shadow)">
+    <rect width="365" height="585" rx="34" fill="#15161a"/>
+    <rect x="23" y="25" width="319" height="478" rx="10" fill="url(#night)"/>
+    <g fill="#9d76e8" opacity=".65">
+      <rect x="55" y="58" width="7" height="18"/><rect x="104" y="95" width="6" height="22"/><rect x="280" y="72" width="7" height="20"/>
+      <rect x="76" y="175" width="7" height="20"/><rect x="244" y="148" width="6" height="18"/><rect x="305" y="206" width="7" height="22"/>
+    </g>
+    <text x="182" y="75" text-anchor="middle" class="screenTitle" font-size="19">00:00 → 10:00</text>
+    <path d="M105 290c0-55 34-92 77-92s77 37 77 92c0 42-23 73-77 73s-77-31-77-73z" fill="#7f5bd1" opacity=".42"/>
+    <text x="182" y="276" text-anchor="middle" class="screenTitle" font-size="74">?</text>
+    <text x="182" y="405" text-anchor="middle" class="screenTitle" font-size="18">STILL CONDENSING</text>
+    <text x="182" y="443" text-anchor="middle" class="screenTitle" font-size="28" fill="#ffd86b">07:42:18</text>
+    <text x="182" y="535" text-anchor="middle" class="screenTitle" font-size="15">WAITING AFTER MIDNIGHT</text>
+  </g>
+
+  <path d="M435 430h65" stroke="#8b9099" stroke-width="5"/><path d="M488 418l15 12-15 12" fill="none" stroke="#8b9099" stroke-width="5"/>
+
+  <g transform="translate(505 150)" filter="url(#shadow)">
+    <rect width="365" height="585" rx="34" fill="#15161a"/>
+    <rect x="23" y="25" width="319" height="478" rx="10" fill="url(#ready)"/>
+    <rect x="66" y="80" width="233" height="350" rx="18" fill="#2b1b4a" stroke="#ffd86b" stroke-width="7"/>
+    <path d="M66 140l233-60M66 215l233-60M66 290l233-60M66 365l233-60" stroke="#7658d4" stroke-width="13" opacity=".55"/>
+    <text x="182" y="130" text-anchor="middle" class="screenTitle" font-size="16" fill="#ffd86b">PIXEL RAIN SEALED</text>
+    <text x="182" y="270" text-anchor="middle" class="screenTitle" font-size="88">?</text>
+    <text x="182" y="390" text-anchor="middle" class="screenTitle" font-size="16">A NEW CARD</text>
+    <text x="182" y="420" text-anchor="middle" class="screenTitle" font-size="16">HAS BLOOMED</text>
+    <text x="182" y="470" text-anchor="middle" class="screenTitle" font-size="14" fill="#ffd86b">PRESS CENTER</text>
+    <text x="182" y="535" text-anchor="middle" class="screenTitle" font-size="15">READY TO REVEAL</text>
+  </g>
+
+  <path d="M885 430h65" stroke="#8b9099" stroke-width="5"/><path d="M938 418l15 12-15 12" fill="none" stroke="#8b9099" stroke-width="5"/>
+
+  <g transform="translate(955 150)" filter="url(#shadow)">
+    <rect width="365" height="585" rx="34" fill="#15161a"/>
+    <rect x="23" y="25" width="319" height="478" rx="10" fill="#22143d"/>
+    <g clip-path="url(#card3)"><image x="23" y="25" width="319" height="478" preserveAspectRatio="none" xlink:href="mochibo-screen.png"/></g>
+    <g fill="#ff8fc5"><rect x="35" y="95" width="9" height="18" transform="rotate(24 39 104)"/><rect x="314" y="120" width="10" height="20" transform="rotate(-20 319 130)"/><rect x="55" y="390" width="9" height="19"/></g>
+    <g fill="#ffd86b"><rect x="65" y="145" width="11" height="21" transform="rotate(-32 70 155)"/><rect x="292" y="350" width="9" height="18" transform="rotate(35 296 359)"/></g>
+    <g fill="#7fe3c0"><rect x="43" y="305" width="8" height="18"/><rect x="322" y="250" width="10" height="19"/></g>
+    <text x="182" y="535" text-anchor="middle" class="screenTitle" font-size="15">POP + CONFETTI + COLOR</text>
+  </g>
+
+  <path d="M1335 430h65" stroke="#8b9099" stroke-width="5"/><path d="M1388 418l15 12-15 12" fill="none" stroke="#8b9099" stroke-width="5"/>
+
+  <g transform="translate(1405 150)" filter="url(#shadow)">
+    <rect width="340" height="585" rx="34" fill="#15161a"/>
+    <rect x="22" y="25" width="296" height="478" rx="10" fill="#fff6e5"/>
+    <g clip-path="url(#card4)">
+      <image x="22" y="25" width="296" height="444" preserveAspectRatio="none" xlink:href="mochibo-screen.png"/>
+      <rect x="22" y="25" width="296" height="42" fill="#000000" opacity=".62"/>
+    </g>
+    <text x="170" y="51" text-anchor="middle" class="screenTitle" font-size="18"
+          paint-order="stroke" stroke="#000000" stroke-width="4" stroke-linejoin="round">SLIMEDEX · 14/14</text>
+    <circle cx="60" cy="449" r="25" fill="#8fd3ff"/><path d="M67 438l-13 11 13 11" fill="none" stroke="#2b1b4a" stroke-width="5"/>
+    <circle cx="280" cy="449" r="25" fill="#ff8fc5"/><path d="M273 438l13 11-13 11" fill="none" stroke="#2b1b4a" stroke-width="5"/>
+    <text x="170" y="535" text-anchor="middle" class="screenTitle" font-size="15">BROWSE BLOOMED CARDS</text>
+  </g>
+
+  <g transform="translate(75 795)">
+    <circle cx="15" cy="15" r="12" fill="#7b5ce6"/><text x="40" y="22" class="caption" font-size="20">Slow pixel rain, breathing silhouette, countdown</text>
+    <circle cx="580" cy="15" r="12" fill="#ffd86b"/><text x="605" y="22" class="caption" font-size="20">Sealed card: no artwork before the center button is pressed</text>
+    <circle cx="15" cy="65" r="12" fill="#ff8fc5"/><text x="40" y="72" class="caption" font-size="20">Reveal: squeeze, flash, pop, 32 confetti pieces, rarity glow</text>
+    <circle cx="780" cy="65" r="12" fill="#7fe3c0"/><text x="805" y="72" class="caption" font-size="20">Left/right: history · center: details or return to Today</text>
+  </g>
+</svg>

@@ -1,0 +1,75 @@
+PIXELSLIME POD: MAKERFABS BUILD GUIDE
+====================================
+
+BOARD
+-----
+Makerfabs ESP32-S3 SPI TFT with Touch 3.5" ILI9488
+https://www.makerfabs.com/esp32-s3-spi-tft-with-touch-ili9488.html
+
+Board dimensions: 66 x 84.3 x 12 mm
+Power: USB-C, 5 V
+Display: 320 x 480 after rotation to portrait orientation
+
+PROPOSED ENCLOSURE
+------------------
+External dimensions: 98 x 130 x 22 mm
+Material: opaque PLA
+Front panel: 2.5 mm
+Rear cover: 2 mm
+Board mounting: four M2.5 x 6 mm standoffs
+Rear cover: four M2.5 screws
+Buttons: three 12 mm holes
+
+Do not finalize the STL before measuring the received board with calipers.
+The manufacturer's dimensions do not include every connector and mounting-hole
+position.
+
+BUTTON WIRING
+-------------
+J3 is the black 1 x 15 expansion header on the rear of the board. The following
+pinout was checked against the official Eagle schematic, revision 1.1.
+
+J3-2  GND   -> common return for all three buttons
+J3-10 GPIO6 -> RIGHT button
+J3-11 GPIO4 -> LEFT button
+J3-12 GPIO5 -> OPEN button
+
+Each button is a normally open momentary contact:
+
+GPIO ---- button ---- GND
+
+No external resistor is required when the firmware uses INPUT_PULLUP. A released
+button reads HIGH and a pressed button reads LOW.
+
+BOARD-SIDE CONNECTION
+---------------------
+1. Separate four male-to-female Dupont wires.
+2. Insert the male pins into J3-2, J3-10, J3-11 and J3-12.
+3. Cut the female ends and solder the wires to the button terminals.
+4. Cover every terminal with heat-shrink tubing.
+5. Leave 10 to 12 cm of wire so the rear cover can be opened.
+6. Join the three button returns to the wire connected to J3-2/GND.
+
+BUTTON PARTS
+------------
+- Three normally open 12 mm panel-mount momentary buttons
+- Four 2.54 mm male-to-female Dupont wires
+- Heat-shrink tubing
+
+FILES
+-----
+pixelslime-real-enclosure.png
+  Dimensioned mechanical mockup.
+
+pixelslime-real-button-wiring.png
+  Board photograph and button wiring diagram.
+
+pixelslime-buttons-test.ino
+  Minimal program for testing all three buttons.
+
+makerfabs-board-front.jpg / makerfabs-board-back.jpg
+  Manufacturer reference photographs.
+
+OFFICIAL SOURCE
+---------------
+https://github.com/Makerfabs/Makerfabs-ESP32-S3-SPI-TFT-with-Touch

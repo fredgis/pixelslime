@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000" flood-opacity=".2"/></filter>
+    <style>
+      .title{font-family:Arial,sans-serif;font-weight:700;fill:#17191d}
+      .body{font-family:Arial,sans-serif;fill:#464a51}
+      .mono{font-family:Consolas,monospace;font-weight:700;fill:#202227}
+      .wire4{stroke:#2f78c4;stroke-width:7;fill:none}
+      .wire5{stroke:#56a65c;stroke-width:7;fill:none}
+      .wire6{stroke:#e18a2f;stroke-width:7;fill:none}
+      .gnd{stroke:#15171a;stroke-width:8;fill:none}
+      .call{fill:#fff;stroke:#b9bdc5;stroke-width:2}
+    </style>
+  </defs>
+  <rect width="1800" height="1200" fill="#f1f2f4"/>
+  <text x="65" y="62" class="title" font-size="38">Makerfabs: three-button wiring</text>
+  <text x="67" y="100" class="body" font-size="20">J3 expansion header, 2.54 mm pitch, checked against official Eagle schematic revision 1.1</text>
+
+  <g transform="translate(55 145)" filter="url(#s)">
+    <rect width="920" height="690" rx="14" fill="#fff"/>
+    <image x="20" y="20" width="880" height="650" preserveAspectRatio="xMidYMid meet" xlink:href="makerfabs-board-back-large.png"/>
+    <rect x="92" y="510" width="502" height="112" rx="8" fill="none" stroke="#ffe149" stroke-width="8"/>
+    <text x="110" y="500" class="title" font-size="22" fill="#111">J3: 1 × 15 HEADER</text>
+    <circle cx="395" cy="568" r="14" fill="#e18a2f" stroke="#fff" stroke-width="4"/>
+    <circle cx="430" cy="568" r="14" fill="#2f78c4" stroke="#fff" stroke-width="4"/>
+    <circle cx="466" cy="568" r="14" fill="#56a65c" stroke="#fff" stroke-width="4"/>
+    <circle cx="150" cy="568" r="14" fill="#15171a" stroke="#fff" stroke-width="4"/>
+  </g>
+
+  <g transform="translate(1010 145)">
+    <rect width="720" height="390" rx="18" class="call"/>
+    <text x="28" y="46" class="title" font-size="27">PINS TO USE</text>
+    <text x="28" y="94" class="mono" font-size="22">J3-2  = GND</text>
+    <text x="28" y="136" class="mono" font-size="22" fill="#e18a2f">J3-10 = GPIO6  → RIGHT button</text>
+    <text x="28" y="178" class="mono" font-size="22" fill="#2f78c4">J3-11 = GPIO4  → LEFT button</text>
+    <text x="28" y="220" class="mono" font-size="22" fill="#56a65c">J3-12 = GPIO5  → OPEN button</text>
+    <line x1="30" y1="250" x2="690" y2="250" stroke="#d5d7db" stroke-width="2"/>
+    <text x="28" y="290" class="body" font-size="20">No soldering is required on the board:</text>
+    <text x="28" y="326" class="body" font-size="20">Insert four male Dupont pins directly into J3.</text>
+    <text x="28" y="362" class="body" font-size="20">Cut the other ends and solder them to the buttons.</text>
+  </g>
+
+  <text x="1010" y="605" class="title" font-size="27">ELECTRICAL SCHEMATIC</text>
+  <g transform="translate(1010 650)">
+    <path d="M20 390h680" class="gnd"/>
+    <text x="25" y="430" class="mono" font-size="22">J3-2 · COMMON GROUND</text>
+
+    <path d="M125 40v115" class="wire4"/><circle cx="125" cy="195" r="42" fill="#fff" stroke="#2f78c4" stroke-width="7"/>
+    <path d="M105 195h40m-20-20v40" stroke="#2f78c4" stroke-width="5"/>
+    <path d="M125 237v153" class="gnd"/>
+    <text x="125" y="15" text-anchor="middle" class="mono" font-size="21" fill="#2f78c4">J3-11 / GPIO4</text>
+    <text x="125" y="275" text-anchor="middle" class="title" font-size="20" paint-order="stroke" stroke="#f1f2f4" stroke-width="9">LEFT</text>
+
+    <path d="M360 40v115" class="wire5"/><circle cx="360" cy="195" r="42" fill="#fff" stroke="#56a65c" stroke-width="7"/>
+    <path d="M340 195h40m-20-20v40" stroke="#56a65c" stroke-width="5"/>
+    <path d="M360 237v153" class="gnd"/>
+    <text x="360" y="15" text-anchor="middle" class="mono" font-size="21" fill="#56a65c">J3-12 / GPIO5</text>
+    <text x="360" y="275" text-anchor="middle" class="title" font-size="20" paint-order="stroke" stroke="#f1f2f4" stroke-width="9">OPEN</text>
+
+    <path d="M595 40v115" class="wire6"/><circle cx="595" cy="195" r="42" fill="#fff" stroke="#e18a2f" stroke-width="7"/>
+    <path d="M575 195h40m-20-20v40" stroke="#e18a2f" stroke-width="5"/>
+    <path d="M595 237v153" class="gnd"/>
+    <text x="595" y="15" text-anchor="middle" class="mono" font-size="21" fill="#e18a2f">J3-10 / GPIO6</text>
+    <text x="595" y="275" text-anchor="middle" class="title" font-size="20" paint-order="stroke" stroke="#f1f2f4" stroke-width="9">RIGHT</text>
+  </g>
+
+  <g transform="translate(80 890)">
+    <rect width="845" height="240" rx="18" fill="#fff" stroke="#b9bdc5" stroke-width="2"/>
+    <text x="28" y="45" class="title" font-size="25">BUTTON PARTS</text>
+    <text x="28" y="88" class="body" font-size="20">• Three normally open 12 mm panel-mount momentary buttons</text>
+    <text x="28" y="128" class="body" font-size="20">• Four 2.54 mm male-to-female Dupont wires</text>
+    <text x="28" y="168" class="body" font-size="20">• Cut the female ends and solder the wires to the buttons</text>
+    <text x="28" y="208" class="body" font-size="20">• Heat-shrink tubing on every terminal</text>
+  </g>
+
+  <rect x="1010" y="1080" width="720" height="54" rx="10" fill="#202329"/>
+  <text x="1035" y="1115" font-family="Consolas" font-weight="700" font-size="18" fill="#fff">CODE: pinMode(4, INPUT_PULLUP); repeat for pins 5 and 6</text>
+</svg>

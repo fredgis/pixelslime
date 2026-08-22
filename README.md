@@ -35,6 +35,19 @@ card, paints it, verifies it, stores it, anchors it, and goes back to sleep. It 
 
 ---
 
+## Meet PixelSlime POD
+
+<div align="center">
+  <img src="docs/assets/pixelslime-pod/pixelslime-real-enclosure.png" alt="PixelSlime POD physical display" width="760">
+</div>
+
+**PixelSlime POD** is an ESP32-S3 desk display that waits for the daily 10:00 Europe/Paris bloom,
+runs a physical pop-and-confetti reveal, and browses the SLIMEDEX with three buttons.
+
+**[Build the PixelSlime POD →](docs/PIXELSLIME-POD.md)**
+
+---
+
 ## ✨ Three things that make it interesting
 
 | | |
@@ -184,6 +197,7 @@ Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`
 
 | Document | Who it's for |
 |---|---|
+| **[`docs/PIXELSLIME-POD.md`](docs/PIXELSLIME-POD.md)** | Makers — the complete hardware, enclosure, firmware and API build guide |
 | **[`docs/EASYLEARN.md`](docs/EASYLEARN.md)** | Newcomers — the whole thing in plain language, no jargon |
 | **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** | Operators & engineers — what is *actually* deployed on Azure and Amoy, with drift called out |
 | **[`docs/HOWITWORKS.md`](docs/HOWITWORKS.md)** | Engineers — the byte-for-byte data path through asmDB and the chain |
