@@ -35,19 +35,6 @@ card, paints it, verifies it, stores it, anchors it, and goes back to sleep. It 
 
 ---
 
-## Meet PixelSlime POD
-
-<div align="center">
-  <img src="docs/assets/pixelslime-pod/pixelslime-real-enclosure.png" alt="PixelSlime POD physical display" width="760">
-</div>
-
-**PixelSlime POD** is an ESP32-S3 desk display that waits for the daily 10:00 Europe/Paris bloom,
-runs a physical pop-and-confetti reveal, and browses the SLIMEDEX with three buttons.
-
-**[Build the PixelSlime POD →](docs/PIXELSLIME-POD.md)**
-
----
-
 ## ✨ Three things that make it interesting
 
 | | |
@@ -85,6 +72,19 @@ Every card exposes its own **provenance**: the literal Z85 bytes exactly as they
 <div align="center">
   <img src="docs/assets/profile.png" alt="Slime Profile — stats, lore and the 175 packed bytes" width="740">
 </div>
+
+---
+
+## Meet PixelSlime POD
+
+<div align="center">
+  <img src="docs/assets/pixelslime-pod/pixelslime-real-enclosure.png" alt="PixelSlime POD physical display" width="760">
+</div>
+
+**PixelSlime POD** is an ESP32-S3 desk display that waits for the daily 10:00 Europe/Paris bloom,
+runs a physical pop-and-confetti reveal, and browses the SLIMEDEX with three buttons.
+
+**[Build the PixelSlime POD →](docs/PIXELSLIME-POD.md)**
 
 ---
 
