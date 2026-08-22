@@ -137,6 +137,10 @@ flowchart TB
     class ZERO stop
 ```
 
+<div align="center">
+  <img src="docs/assets/smile-bank.png" alt="SMILE Bank economy dashboard" width="900">
+</div>
+
 ---
 
 ## 🚀 Quick start — run it locally
