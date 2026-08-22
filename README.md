@@ -81,8 +81,14 @@ Every card exposes its own **provenance**: the literal Z85 bytes exactly as they
   <img src="docs/assets/pixelslime-pod/pixelslime-real-enclosure.png" alt="PixelSlime POD physical display" width="760">
 </div>
 
-**PixelSlime POD** is an ESP32-S3 desk display that waits for the daily 10:00 Europe/Paris bloom,
-runs a physical pop-and-confetti reveal, and browses the SLIMEDEX with three buttons.
+**PixelSlime POD** brings the daily bloom out of the browser and onto a small desk device. It uses a
+Makerfabs ESP32-S3 board with a 3.5-inch portrait display, microSD cache, USB-C power and three physical
+buttons, all inside an opaque 3D-printed slime shell.
+
+From midnight, the screen waits under a slow Pixel Rain and counts down to 10:00 Europe/Paris. The new
+card arrives face down and stays sealed until the center button starts the squeeze, flash, pop and
+rarity-colored confetti reveal. Left and right browse earlier blooms; the center button opens card details
+and a profile QR code. Cached cards remain available when Wi-Fi drops.
 
 **[Build the PixelSlime POD →](docs/PIXELSLIME-POD.md)**
 
