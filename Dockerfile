@@ -30,7 +30,13 @@ RUN npm run build
 
 
 # ── stage 2: python dependencies ──────────────────────────────────────────────
-FROM python:3.12-slim AS deps
+#
+# Pinned by digest, not just by tag. `3.12-slim` is mutable: two builds a month
+# apart produce different images from the same Dockerfile, which makes "rebuild
+# and see" an unreliable answer to a vulnerability report. Refresh this
+# deliberately — that is the cost of the guarantee, and it is the right trade
+# when a scanner asks which base a running container came from.
+FROM python:3.12-slim@sha256:3ecf5ebe01fef4b6e81be34511fb40bf378ea7fd81ab215ba15b2775ef85413d AS deps
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -39,6 +45,12 @@ WORKDIR /install
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# The venv is created with whatever pip the base image ships, which lags the
+# release stream by weeks. Defender scans the venv, so an old pip inside it is
+# reported against the running container even when every declared dependency is
+# current. Upgrade it before installing anything.
+RUN python -m pip install --upgrade pip setuptools wheel
 
 # Install from a generated requirements file rather than parsing pyproject in the
 # image: the layer stays cacheable and the build does not depend on a TOML parser
@@ -54,7 +66,19 @@ RUN pip install -r requirements.txt -c constraints.txt
 
 
 # ── stage 3: runtime ──────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+#
+# Same digest as the deps stage, for the same reason.
+FROM python:3.12-slim@sha256:3ecf5ebe01fef4b6e81be34511fb40bf378ea7fd81ab215ba15b2775ef85413d AS runtime
+
+# Apply the distribution's security updates. The base image is rebuilt on its own
+# cadence, so between two of its releases a patched Debian package exists that the
+# image does not carry yet — util-linux was reported against the running container
+# for exactly that reason. Upgrading here closes the gap without waiting upstream.
+# Kept to a single layer with the lists removed, so it costs nothing in image size.
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
