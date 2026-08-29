@@ -1,7 +1,7 @@
 # PixelSlime Cards
 
 <div align="center">
-  <img src="assets/pixelslime-cards-hero-holographic-fan.webp" alt="PixelSlime Cards physical collector deck" width="100%">
+  <img src="assets/pixelslime-cards-hero-holographic-interleaved.webp" alt="PixelSlime Cards physical collector deck" width="100%">
 </div>
 
 **PixelSlime Cards** brings the daily bloom into a physical poker-size collector deck. This first print
