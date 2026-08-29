@@ -97,7 +97,7 @@ and a profile QR code. Cached cards remain available when Wi-Fi drops.
 ## Meet PixelSlime Cards
 
 <div align="center">
-  <img src="cards/assets/pixelslime-cards-hero.webp" alt="PixelSlime Cards physical collector deck" width="100%">
+  <img src="cards/assets/pixelslime-cards-hero-holographic.webp" alt="PixelSlime Cards physical collector deck" width="100%">
 </div>
 
 **PixelSlime Cards** turns the daily bloom into a physical poker-size collector deck. The first print
