@@ -94,6 +94,25 @@ and a profile QR code. Cached cards remain available when Wi-Fi drops.
 
 ---
 
+## Meet PixelSlime Cards
+
+<div align="center">
+  <img src="cards/assets/pixelslime-cards-hero.webp" alt="PixelSlime Cards physical collector deck" width="100%">
+</div>
+
+**PixelSlime Cards** turns the daily bloom into a physical poker-size collector deck. The first print
+snapshot contains every released slime from **PS-0001 through PS-0033**, plus three original bonus cards
+to complete a 36-card deck. Each slime gets a colourful matching back with its serial, rarity and a QR
+code leading to the live profile and provenance.
+
+The print pack is prepared at PrinterStudio's official **822 × 1122 px / 300 dpi** poker-card size, with
+full bleed, side-by-side previews and an optional common back. It is ready for standard or front-only
+holographic production.
+
+**[Meet PixelSlime Cards →](cards/README.md)**
+
+---
+
 ## 🪙 SLIME and SMILE are two different tokens
 
 They are one letter apart and it trips everyone up. They are **not** versions of each other — they are
@@ -194,6 +213,7 @@ Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`
 | **`backend/`** | FastAPI app + tests — `codec` · `asmdb` · `ai` · `api` · `core` · `storage` · `jobs` · `chain` |
 | **`frontend/`** | Vite + React 18 + TypeScript SPA — a kawaii design system and the five screens |
 | **`chain/`** | Foundry project — the four Solidity contracts, tests, and the Amoy deploy script |
+| **`cards/`** | Print-ready physical deck — 33 released slimes, 3 bonus cards, QR backs and previews |
 | **`contracts/`** | The binding truth: `card.schema.json`, `openapi.yaml`, design tokens, lookups, card fixtures |
 | **`infra/`** | Bicep — identity, Key Vault, Storage, ACR, Container Apps, VNet, RBAC |
 | **`assets/`** | The pinned DEFLATE dictionary (`psdict_v1.bin`) and the Mochibo style template |
@@ -208,6 +228,7 @@ Full deployment (Azure + Key Vault bearer + Bicep) lives in **[`docs/RUNBOOK.md`
 | Document | Who it's for |
 |---|---|
 | **[`docs/PIXELSLIME-POD.md`](docs/PIXELSLIME-POD.md)** | Makers — the complete hardware, enclosure, firmware and API build guide |
+| **[`cards/README.md`](cards/README.md)** | Collectors — the physical card deck, print files, previews and ordering guide |
 | **[`docs/EASYLEARN.md`](docs/EASYLEARN.md)** | Newcomers — the whole thing in plain language, no jargon |
 | **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** | Operators & engineers — what is *actually* deployed on Azure and Amoy, with drift called out |
 | **[`docs/HOWITWORKS.md`](docs/HOWITWORKS.md)** | Engineers — the byte-for-byte data path through asmDB and the chain |

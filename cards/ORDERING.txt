@@ -1,0 +1,40 @@
+PIXELSLIME - PACK D'IMPRESSION CORRIGE
+========================================
+
+Collection capturee le 29/08/2026 : 33 cartes publiees.
+Trois cartes bonus ont ete ajoutees pour constituer un jeu de 36 cartes.
+
+IMPRIMEUR CONSEILLE
+-------------------
+PrinterStudio France
+https://www.printerstudio.fr/personnalise/cartes-de-jeu-sur-mesure-cartes-blanches.html
+
+Choisir :
+- format 63 x 88 mm ;
+- 36 cartes ;
+- impression recto verso ;
+- finition Standard (lisse) pour le premier prototype ;
+- images differentes sur les rectos et les versos.
+
+FICHIERS A TELECHARGER SUR LE SITE
+----------------------------------
+01-rectos-printerstudio-822x1122 : rectos dans l'ordre 001 a 036.
+02-versos-printerstudio-822x1122 : versos correspondants dans le meme ordre.
+Le fichier 000-verso-commun-optionnel.png permet d'utiliser un verso identique
+si l'interface de commande le demande.
+
+SPECIFICATIONS
+--------------
+- 822 x 1122 pixels, minimum officiel PrinterStudio ;
+- 300 dpi ;
+- coupe finale 63,5 x 88,9 mm ;
+- fond perdu officiel de 36 pixels sur chaque cote ;
+- RGB, PNG.
+
+Ne pas telecharger le dossier 03-apercus-recto-verso chez l'imprimeur :
+il sert uniquement a verifier visuellement les paires.
+Les originaux 1024 x 1536 sont conserves dans le dossier 04.
+
+Faire d'abord imprimer un seul prototype en finition Standard et verifier
+la coupe, la lisibilite des petits textes et l'alignement recto-verso avant
+de commander une serie ou une finition holographique.

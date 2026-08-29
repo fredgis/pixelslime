@@ -1,0 +1,37 @@
+﻿slot,kind,card_id,name,rarity,mint_date,profile_url,recto_file,verso_file,original_file
+1,released,PS-0001,Mochibo,EPIC,2026-07-28,https://www.pixelslime.cloud/slime/1,001-PS-0001-Mochibo-recto.png,001-PS-0001-Mochibo-verso.png,001-PS-0001-Mochibo-original.png
+2,released,PS-0002,Glitchgloop,RARE,2026-07-29,https://www.pixelslime.cloud/slime/2,002-PS-0002-Glitchgloop-recto.png,002-PS-0002-Glitchgloop-verso.png,002-PS-0002-Glitchgloop-original.png
+3,released,PS-0003,Chillbit,RARE,2026-07-30,https://www.pixelslime.cloud/slime/3,003-PS-0003-Chillbit-recto.png,003-PS-0003-Chillbit-verso.png,003-PS-0003-Chillbit-original.png
+4,released,PS-0004,Nimbusnoop,COMMON,2026-07-31,https://www.pixelslime.cloud/slime/4,004-PS-0004-Nimbusnoop-recto.png,004-PS-0004-Nimbusnoop-verso.png,004-PS-0004-Nimbusnoop-original.png
+5,released,PS-0005,Drowsevolt,RARE,2026-08-01,https://www.pixelslime.cloud/slime/5,005-PS-0005-Drowsevolt-recto.png,005-PS-0005-Drowsevolt-verso.png,005-PS-0005-Drowsevolt-original.png
+6,released,PS-0006,Astropuddle,EPIC,2026-08-02,https://www.pixelslime.cloud/slime/6,006-PS-0006-Astropuddle-recto.png,006-PS-0006-Astropuddle-verso.png,006-PS-0006-Astropuddle-original.png
+7,released,PS-0007,Spooket,UNCOMMON,2026-08-03,https://www.pixelslime.cloud/slime/7,007-PS-0007-Spooket-recto.png,007-PS-0007-Spooket-verso.png,007-PS-0007-Spooket-original.png
+8,released,PS-0008,Frosternook,RARE,2026-08-04,https://www.pixelslime.cloud/slime/8,008-PS-0008-Frosternook-recto.png,008-PS-0008-Frosternook-verso.png,008-PS-0008-Frosternook-original.png
+9,released,PS-0009,Tidecrackle,UNCOMMON,2026-08-05,https://www.pixelslime.cloud/slime/9,009-PS-0009-Tidecrackle-recto.png,009-PS-0009-Tidecrackle-verso.png,009-PS-0009-Tidecrackle-original.png
+10,released,PS-0010,Petalblip,COMMON,2026-08-06,https://www.pixelslime.cloud/slime/10,010-PS-0010-Petalblip-recto.png,010-PS-0010-Petalblip-verso.png,010-PS-0010-Petalblip-original.png
+11,released,PS-0011,Mossmallow,UNCOMMON,2026-08-07,https://www.pixelslime.cloud/slime/11,011-PS-0011-Mossmallow-recto.png,011-PS-0011-Mossmallow-verso.png,011-PS-0011-Mossmallow-original.png
+12,released,PS-0012,Sproutscowl,COMMON,2026-08-08,https://www.pixelslime.cloud/slime/12,012-PS-0012-Sproutscowl-recto.png,012-PS-0012-Sproutscowl-verso.png,012-PS-0012-Sproutscowl-original.png
+13,released,PS-0013,Gleamstride,EPIC,2026-08-09,https://www.pixelslime.cloud/slime/13,013-PS-0013-Gleamstride-recto.png,013-PS-0013-Gleamstride-verso.png,013-PS-0013-Gleamstride-original.png
+14,released,PS-0014,Fablewobble,COMMON,2026-08-10,https://www.pixelslime.cloud/slime/14,014-PS-0014-Fablewobble-recto.png,014-PS-0014-Fablewobble-verso.png,014-PS-0014-Fablewobble-original.png
+15,released,PS-0015,Sunpetal Sage,LEGENDARY,2026-08-11,https://www.pixelslime.cloud/slime/15,015-PS-0015-Sunpetal-Sage-recto.png,015-PS-0015-Sunpetal-Sage-verso.png,015-PS-0015-Sunpetal-Sage-original.png
+16,released,PS-0016,Beamblip,COMMON,2026-08-12,https://www.pixelslime.cloud/slime/16,016-PS-0016-Beamblip-recto.png,016-PS-0016-Beamblip-verso.png,016-PS-0016-Beamblip-original.png
+17,released,PS-0017,Wispdew,EPIC,2026-08-13,https://www.pixelslime.cloud/slime/17,017-PS-0017-Wispdew-recto.png,017-PS-0017-Wispdew-verso.png,017-PS-0017-Wispdew-original.png
+18,released,PS-0018,Voltibop,UNCOMMON,2026-08-14,https://www.pixelslime.cloud/slime/18,018-PS-0018-Voltibop-recto.png,018-PS-0018-Voltibop-verso.png,018-PS-0018-Voltibop-original.png
+19,released,PS-0019,Cloudbud Bounce,UNCOMMON,2026-08-15,https://www.pixelslime.cloud/slime/19,019-PS-0019-Cloudbud-Bounce-recto.png,019-PS-0019-Cloudbud-Bounce-verso.png,019-PS-0019-Cloudbud-Bounce-original.png
+20,released,PS-0020,Quartzgrumble,EPIC,2026-08-16,https://www.pixelslime.cloud/slime/20,020-PS-0020-Quartzgrumble-recto.png,020-PS-0020-Quartzgrumble-verso.png,020-PS-0020-Quartzgrumble-original.png
+21,released,PS-0021,Lucidleaf,UNCOMMON,2026-08-17,https://www.pixelslime.cloud/slime/21,021-PS-0021-Lucidleaf-recto.png,021-PS-0021-Lucidleaf-verso.png,021-PS-0021-Lucidleaf-original.png
+22,released,PS-0022,Cindersnooze,UNCOMMON,2026-08-18,https://www.pixelslime.cloud/slime/22,022-PS-0022-Cindersnooze-recto.png,022-PS-0022-Cindersnooze-verso.png,022-PS-0022-Cindersnooze-original.png
+23,released,PS-0023,Sprocket Splash,COMMON,2026-08-19,https://www.pixelslime.cloud/slime/23,023-PS-0023-Sprocket-Splash-recto.png,023-PS-0023-Sprocket-Splash-verso.png,023-PS-0023-Sprocket-Splash-original.png
+24,released,PS-0024,Gritgasket,RARE,2026-08-20,https://www.pixelslime.cloud/slime/24,024-PS-0024-Gritgasket-recto.png,024-PS-0024-Gritgasket-verso.png,024-PS-0024-Gritgasket-original.png
+25,released,PS-0025,Drizzlemuck,COMMON,2026-08-21,https://www.pixelslime.cloud/slime/25,025-PS-0025-Drizzlemuck-recto.png,025-PS-0025-Drizzlemuck-verso.png,025-PS-0025-Drizzlemuck-original.png
+26,released,PS-0026,Starpool Chime,COMMON,2026-08-22,https://www.pixelslime.cloud/slime/26,026-PS-0026-Starpool-Chime-recto.png,026-PS-0026-Starpool-Chime-verso.png,026-PS-0026-Starpool-Chime-original.png
+27,released,PS-0027,Lumenloaf,UNCOMMON,2026-08-23,https://www.pixelslime.cloud/slime/27,027-PS-0027-Lumenloaf-recto.png,027-PS-0027-Lumenloaf-verso.png,027-PS-0027-Lumenloaf-original.png
+28,released,PS-0028,Quillipop,UNCOMMON,2026-08-24,https://www.pixelslime.cloud/slime/28,028-PS-0028-Quillipop-recto.png,028-PS-0028-Quillipop-verso.png,028-PS-0028-Quillipop-original.png
+29,released,PS-0029,Moonmurmur,UNCOMMON,2026-08-25,https://www.pixelslime.cloud/slime/29,029-PS-0029-Moonmurmur-recto.png,029-PS-0029-Moonmurmur-verso.png,029-PS-0029-Moonmurmur-original.png
+30,released,PS-0030,Fernyawn,UNCOMMON,2026-08-26,https://www.pixelslime.cloud/slime/30,030-PS-0030-Fernyawn-recto.png,030-PS-0030-Fernyawn-verso.png,030-PS-0030-Fernyawn-original.png
+31,released,PS-0031,Dreamcade Drift,UNCOMMON,2026-08-27,https://www.pixelslime.cloud/slime/31,031-PS-0031-Dreamcade-Drift-recto.png,031-PS-0031-Dreamcade-Drift-verso.png,031-PS-0031-Dreamcade-Drift-original.png
+32,released,PS-0032,Joyzap Jello,UNCOMMON,2026-08-28,https://www.pixelslime.cloud/slime/32,032-PS-0032-Joyzap-Jello-recto.png,032-PS-0032-Joyzap-Jello-verso.png,032-PS-0032-Joyzap-Jello-original.png
+33,released,PS-0033,Sugarsprig,COMMON,2026-08-29,https://www.pixelslime.cloud/slime/33,033-PS-0033-Sugarsprig-recto.png,033-PS-0033-Sugarsprig-verso.png,033-PS-0033-Sugarsprig-original.png
+34,bonus,BONUS-01,First Blooms,EPIC,2026-08-29,https://www.pixelslime.cloud/dex,034-BONUS-01-First-Blooms-recto.png,034-BONUS-01-First-Blooms-verso.png,
+35,bonus,BONUS-02,Rarity Houses,LEGENDARY,2026-08-29,https://www.pixelslime.cloud/lab,035-BONUS-02-Rarity-Houses-recto.png,035-BONUS-02-Rarity-Houses-verso.png,
+36,bonus,BONUS-03,Verify Your Slime,RARE,2026-08-29,https://www.pixelslime.cloud,036-BONUS-03-Verify-Your-Slime-recto.png,036-BONUS-03-Verify-Your-Slime-verso.png,

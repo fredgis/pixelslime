@@ -1,0 +1,15 @@
+{
+  "released_cards": 33,
+  "bonus_cards": 3,
+  "deck_cards": 36,
+  "rectos": 36,
+  "unique_versos": 36,
+  "previews": 36,
+  "originals": 33,
+  "print_dimensions": [
+    822,
+    1122
+  ],
+  "dpi": 300,
+  "output": "C:\\temp\\pixelslime-cards"
+}
