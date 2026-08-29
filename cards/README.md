@@ -56,7 +56,7 @@ the files to upload to the printer.
 ## Collection snapshot
 
 <div align="center">
-  <img src="assets/collection-overview.jpg" alt="The first 33 released PixelSlime cards" width="100%">
+  <img src="assets/collection-overview-holographic.webp" alt="The first 33 released PixelSlime cards with rounded holographic styling" width="100%">
 </div>
 
 This snapshot was assembled on **29 August 2026**. Later daily blooms are not silently added to this
