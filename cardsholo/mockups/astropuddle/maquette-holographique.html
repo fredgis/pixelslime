@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>PixelSlime - Astropuddle / Holographie selective</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #30263f;
+      background: #f5f1e9;
+      font-synthesis: none;
+      --purple: #7346bb;
+      --muted: #807886;
+      --line: #ded8df;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid #b98cff;
+      outline-offset: 5px;
+    }
+    .studio { max-width: 1552px; margin: auto; padding: 34px 40px 24px; }
+    .masthead { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; gap: 12px; align-items: center; font-weight: 850; letter-spacing: 2.3px; font-size: 15px; }
+    .brand svg { width: 35px; height: 31px; }
+    .edition { font: 11px Consolas, monospace; letter-spacing: 1.5px; color: var(--muted); }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 28px; margin: 34px 0 28px; }
+    h1 { font-size: clamp(30px, 3.1vw, 48px); font-weight: 720; line-height: 1.1; margin: 0 0 12px; letter-spacing: -1.8px; }
+    h1 em { font-style: normal; color: var(--purple); }
+    .intro p { margin: 0; color: #777080; line-height: 1.55; font-size: 14px; }
+    .pill { flex-shrink: 0; border: 1px solid #d7cbe4; border-radius: 99px; padding: 11px 17px; font-size: 11px; letter-spacing: .8px; color: var(--purple); font-weight: 750; }
+    .comparison { display: grid; grid-template-columns: 1fr 1.08fr 1fr; gap: 20px; align-items: stretch; }
+    .panel { border: 1px solid #e3dce2; border-radius: 22px; background: #fffcf6; padding: 23px 22px 22px; min-width: 0; }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .panel-head h2 { margin: 0; font-size: 11px; letter-spacing: 1.5px; font-weight: 800; text-transform: uppercase; }
+    .number { font: 12px Consolas, monospace; color: #a298aa; }
+    .panel-hero { background: #251e33; color: #fff7ff; border-color: #332841; position: relative; }
+    .panel-hero .number { color: #a79ab9; }
+    .stage { height: 485px; display: flex; justify-content: center; align-items: center; position: relative; perspective: 1250px; }
+    .stage-hero { background: radial-gradient(ellipse at 50% 54%, #51386765, transparent 65%); }
+    .card { width: min(100%, 287px); aspect-ratio: 822 / 1122; position: relative; border-radius: 11px; overflow: hidden; isolation: isolate; box-shadow: 0 19px 35px #2a183631, 0 3px 6px #2a183620; }
+    .card img { display: block; width: 100%; height: 100%; }
+    .card-hero { width: min(100%, 330px); box-shadow: 0 24px 35px #0007, 0 0 0 1px #ffffff1f; transform-style: preserve-3d; will-change: transform; }
+    .foil-overlay { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: color-dodge; pointer-events: none; opacity: .92; }
+    .card-hero[data-enabled="false"] .foil-overlay { visibility: hidden; }
+    .mask-card { width: min(100%, 257px); aspect-ratio: 822 / 1122; border: 1px solid #d8d1da; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 25px #2a183613; background: white; }
+    .mask-card svg { width: 100%; height: 100%; display: block; }
+    .panel-copy { min-height: 65px; }
+    .panel-copy strong { display: block; font-size: 15px; margin-bottom: 7px; font-weight: 700; }
+    .panel-copy p { color: #89808e; line-height: 1.55; font-size: 12px; margin: 0; }
+    .panel-hero .panel-copy p { color: #b8aac9; }
+    .tag { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 750; letter-spacing: .8px; margin-top: 15px; color: var(--purple); }
+    .tag::before { content: ""; height: 6px; width: 6px; background: #a975dd; border-radius: 50%; }
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 10px; color: #746a7c; margin-top: 15px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { width: 12px; height: 12px; display: inline-block; border: 1px solid #c5bdca; border-radius: 3px; }
+    .swatch.white { background: white; }
+    .swatch.black { background: black; }
+    .controls { margin-top: 17px; padding-top: 15px; border-top: 1px solid #ffffff19; }
+    .control-row { display: flex; gap: 8px; align-items: center; }
+    button { cursor: pointer; }
+    .control-button { color: #ece0fd; border: 1px solid #655373; background: #ffffff08; padding: 7px 11px; border-radius: 7px; font-size: 11px; }
+    .control-button:hover { background: #ffffff13; }
+    .control-button[aria-pressed="true"] { background: #705094; border-color: #9d78c7; color: white; }
+    .slider-label { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 10px; color: #c0b0d1; }
+    .slider-label input { width: 100%; accent-color: #d7a3ff; cursor: pointer; }
+    .slider-label output { font-family: Consolas, monospace; min-width: 36px; text-align: right; }
+    .notes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin: 24px 2px 0; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+    .note-label { font: 10px Consolas, monospace; letter-spacing: 1.1px; color: #9a81a9; display: block; margin-bottom: 7px; }
+    .notes strong { font-size: 12px; display: block; margin-bottom: 5px; }
+    .notes p { font-size: 11px; color: #857b8c; line-height: 1.6; margin: 0; }
+    footer { display: flex; align-items: center; justify-content: space-between; gap: 25px; margin-top: 16px; }
+    .disclaimer { color: #8f8495; max-width: 800px; font-size: 10px; line-height: 1.65; margin: 0; }
+    .downloads { display: flex; flex-shrink: 0; gap: 14px; }
+    .downloads a { color: #675775; text-decoration-color: #bba9c6; text-underline-offset: 4px; font-size: 10px; }
+    @media (max-width: 1100px) {
+      .studio { padding: 28px 22px; }
+      .comparison { gap: 12px; }
+      .panel { padding: 19px 15px; }
+      .stage { height: 380px; }
+      .panel-head h2 { font-size: 10px; letter-spacing: .7px; }
+      footer { align-items: start; }
+    }
+    @media (max-width: 760px) {
+      .studio { padding: 23px 18px; }
+      .masthead { align-items: start; }
+      .edition { max-width: 98px; line-height: 1.6; text-align: right; font-size: 9px; }
+      .intro { display: block; margin: 28px 0 24px; }
+      h1 { font-size: 32px; letter-spacing: -1px; }
+      .intro p { font-size: 13px; }
+      .pill { display: inline-block; margin-top: 18px; font-size: 10px; }
+      .comparison { grid-template-columns: 1fr; gap: 18px; }
+      .panel { padding: 22px; }
+      .panel-hero { order: -1; }
+      .stage { height: auto; padding: 25px 0; }
+      .card-hero { max-width: 330px; }
+      .notes { grid-template-columns: 1fr; gap: 18px; }
+      footer { display: block; }
+      .downloads { flex-wrap: wrap; margin-top: 15px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card-hero { will-change: auto; }
+    }
+    @media print {
+      .studio { padding: 12px; }
+      .controls, .downloads { display: none; }
+      .comparison { grid-template-columns: 1fr 1fr 1fr; }
+      .panel-hero { order: 0; }
+      .stage { height: auto; padding: 20px 0; }
+      .panel { break-inside: avoid; }
+      .notes { grid-template-columns: 1fr 1fr 1fr; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <main class="studio">
+    <header class="masthead">
+      <div class="brand">
+        <svg viewBox="0 0 18 16" role="img" aria-label="Logo PixelSlime" shape-rendering="crispEdges">
+          <path d="M5 1h8v2h2v2h2v8H1V5h2V3h2z" fill="#d89bbd"/>
+          <path d="M3 11h12v2H3z" fill="#c278a3"/>
+          <path d="M5 6h2v3H5zm6 0h2v3h-2zM8 10h2v1H8z" fill="#493257"/>
+          <path d="M4 4h2v1H4z" fill="#fff0f8"/>
+        </svg>
+        PIXELSLIME
+      </div>
+      <span class="edition">MATERIAL STUDY / 002</span>
+    </header>
+
+    <section class="intro" aria-labelledby="title">
+      <div>
+        <h1>Astropuddle, en <em>holo s&eacute;lectif.</em></h1>
+        <p>Ton illustration. Des reflets dans le d&eacute;cor. Les deux personnages et les textes restent nets.</p>
+      </div>
+      <span class="pill">PS-0006 &nbsp;&middot;&nbsp; EPIC &nbsp;&middot;&nbsp; MAQUETTE</span>
+    </section>
+
+    <section class="comparison" aria-label="Comparaison du visuel, de la finition et du masque">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Ton visuel d'origine</h2>
+          <span class="number">01</span>
+        </div>
+        <div class="stage">
+          <div class="card">
+            <img src="Astropuddle-visuel-source.png" width="822" height="1122" alt="Carte originale Astropuddle, un slime cosmique et son compagnon de feu dans une ruelle nocturne">
+          </div>
+        </div>
+        <div class="panel-copy">
+          <strong>Le dessin ne change pas.</strong>
+          <p>Ta carte existante est conserv&eacute;e telle quelle, sans ajouter de reflets physiques sur cette vue.</p>
+        </div>
+        <span class="tag">SOURCE ORIGINALE CONSERV&Eacute;E</span>
+      </article>
+
+      <article class="panel panel-hero">
+        <div class="panel-head">
+          <h2>Simulation holographique</h2>
+          <span class="number">02</span>
+        </div>
+        <div class="stage stage-hero" id="turntable">
+          <div class="card card-hero" id="holo-card" data-enabled="true">
+            <img src="Astropuddle-visuel-source.png" width="822" height="1122" alt="Astropuddle avec des reflets holographiques limites au decor et aux deux gemmes du haut">
+          </div>
+        </div>
+        <div class="panel-copy">
+          <strong>Le d&eacute;cor prend la lumi&egrave;re.</strong>
+          <p>Incline la carte avec la souris, ou d&eacute;place la lumi&egrave;re avec le curseur.</p>
+        </div>
+        <div class="controls" aria-label="Reglages de la simulation">
+          <div class="control-row">
+            <button type="button" class="control-button" id="toggle-holo" aria-pressed="true">Holo activ&eacute;</button>
+            <button type="button" class="control-button" id="toggle-motion" aria-pressed="true">Pause reflets</button>
+          </div>
+          <label class="slider-label">
+            <span>Lumi&egrave;re</span>
+            <input id="light-angle" type="range" min="0" max="360" value="42" aria-label="Angle de la lumiere">
+            <output id="angle-output" for="light-angle">42&deg;</output>
+          </label>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Blanc de soutien</h2>
+          <span class="number">03</span>
+        </div>
+        <div class="stage">
+          <div class="mask-card" id="white-ink-preview" role="img" aria-label="Masque : blanc opaque sur les deux personnages et les textes, noir dans les zones holographiques"></div>
+        </div>
+        <div class="panel-copy">
+          <strong>Un masque, pas un second dessin.</strong>
+          <p>La sous-couche blanche cache l'holographie l&agrave; o&ugrave; il faut prot&eacute;ger les couleurs.</p>
+        </div>
+        <div class="legend">
+          <span><i class="swatch white"></i>Blanc = encre opaque</span>
+          <span><i class="swatch black"></i>Noir = effet holo</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="notes" aria-label="Repartition de la finition">
+      <div>
+        <span class="note-label">HOLO / ZONES OUVERTES</span>
+        <strong>Le d&eacute;cor + les deux gemmes du haut.</strong>
+        <p>Un reflet arc-en-ciel se d&eacute;place sur ces zones seulement.</p>
+      </div>
+      <div>
+        <span class="note-label">OPAQUE / ZONES PROT&Eacute;G&Eacute;ES</span>
+        <strong>Astropuddle, Ember Pup, le type et les textes.</strong>
+        <p>Le slime cosmique et son compagnon gardent leurs couleurs d'origine.</p>
+      </div>
+      <div>
+        <span class="note-label">FABRICATION / 2 COUCHES</span>
+        <strong>Le visuel couleur + un masque de blanc.</strong>
+        <p>M&ecirc;mes dimensions : 822 &times; 1122 px. Le masque est aussi fourni en SVG.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p class="disclaimer">Simulation d'intention, pas un bon &agrave; tirer. Le masque est un exemple &agrave; adapter au gabarit, au rep&eacute;rage et &agrave; la convention de l'imprimeur. Les reflets d&eacute;j&agrave; dessin&eacute;s dans l'image restent dans le visuel source. Aucun enregistrement blockchain n'est cr&eacute;&eacute; par cette maquette.</p>
+      <nav class="downloads" aria-label="Fichiers de la maquette">
+        <a href="Astropuddle-rendu-holo.png" download>Rendu PNG</a>
+        <a href="Astropuddle-masque-blanc.png" download>Masque PNG</a>
+        <a href="Astropuddle-masque-blanc.svg" download>Masque SVG</a>
+      </nav>
+    </footer>
+  </main>
+
+  <script>
+    "use strict";
+
+    const NS = "http://www.w3.org/2000/svg";
+    const WIDTH = 822;
+    const HEIGHT = 1122;
+    const spec = {
+  "foil": [
+    [
+      "path",
+      {
+        "d": "M156 242H666L691 267V660H551L520 689H300L269 661H149L131 643V269Z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M411 82L431 104V119L412 137L393 117V101Z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M653 184L674 200L653 218L633 200Z"
+      }
+    ]
+  ],
+  "protected": [
+    [
+      "rect",
+      {
+        "x": 139,
+        "y": 250,
+        "width": 126,
+        "height": 65,
+        "rx": 5
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M246 548L253 513L267 483L287 463L310 450L337 440L361 438L366 433L357 428L358 418L370 409L385 405L401 407L414 415L425 430L429 446L425 460L418 470L431 482L443 501L455 522L465 551L471 572L470 592L462 609L449 621L431 630L410 635L383 638L353 639L320 637L292 633L271 627L254 617L243 603L239 586L239 570Z"
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": 254,
+        "cy": 564,
+        "r": 20
+      }
+    ],
+    [
+      "circle",
+      {
+        "cx": 488,
+        "cy": 520,
+        "r": 18
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M486 644L490 627L486 614L487 594L494 576L503 565L505 551L511 535L525 540L534 552L545 550L556 541L557 533L573 522L586 505L596 485L605 497L607 512L600 526L589 537L586 548L594 561L599 572L605 581L609 566L617 554L628 550L641 553L655 561L650 570L635 572L631 579L637 591L643 607L640 623L630 635L623 645L624 653L615 659L601 658L593 651L581 658L562 665L539 667L520 660L509 661L496 659L490 653Z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M411 663L434 689L411 715L389 690Z"
+      }
+    ]
+  ]
+};
+
+    function svgElement(name, attributes = {}) {
+      const node = document.createElementNS(NS, name);
+      for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+      return node;
+    }
+
+    function addShapes(parent, shapes, fill) {
+      for (const [name, attributes] of shapes) {
+        parent.append(svgElement(name, { ...attributes, fill }));
+      }
+    }
+
+    function addStencil(parent, background, foil, protectedColor) {
+      parent.append(svgElement("rect", { width: WIDTH, height: HEIGHT, fill: background }));
+      addShapes(parent, spec.foil, foil);
+      addShapes(parent, spec.protected, protectedColor);
+    }
+
+    const whiteInk = svgElement("svg", {
+      xmlns: NS, viewBox: `0 0 ${WIDTH} ${HEIGHT}`, width: WIDTH, height: HEIGHT,
+      "aria-hidden": "true"
+    });
+    addStencil(whiteInk, "white", "black", "white");
+    document.getElementById("white-ink-preview").append(whiteInk);
+
+    const overlay = svgElement("svg", {
+      xmlns: NS, viewBox: `0 0 ${WIDTH} ${HEIGHT}`, width: WIDTH, height: HEIGHT,
+      class: "foil-overlay", "aria-hidden": "true"
+    });
+    const defs = svgElement("defs");
+    const foilMask = svgElement("mask", {
+      id: "foil-window", x: 0, y: 0, width: WIDTH, height: HEIGHT,
+      maskUnits: "userSpaceOnUse", maskContentUnits: "userSpaceOnUse",
+      style: "mask-type:luminance"
+    });
+    addStencil(foilMask, "black", "white", "black");
+    defs.append(foilMask);
+
+    const rainbow = svgElement("linearGradient", {
+      id: "prismatic-color", gradientUnits: "userSpaceOnUse", x1: -180, y1: 130, x2: 1100, y2: 870
+    });
+    for (const [offset, color, opacity] of [
+      [0, "#ef8eb9", .1], [.16, "#af72ff", .2], [.32, "#6689ff", .32],
+      [.47, "#6be1eb", .43], [.6, "#96e8c5", .25], [.73, "#f3d788", .28],
+      [.87, "#ef97bb", .33], [1, "#bd83ed", .1]
+    ]) {
+      rainbow.append(svgElement("stop", { offset, "stop-color": color, "stop-opacity": opacity }));
+    }
+    defs.append(rainbow);
+
+    const gleam = svgElement("linearGradient", {
+      id: "moving-gleam", gradientUnits: "userSpaceOnUse", x1: 0, y1: 0, x2: WIDTH, y2: HEIGHT
+    });
+    for (const [offset, opacity] of [[0, 0], [.32, 0], [.44, .03], [.49, .32], [.52, .07], [.6, 0], [1, 0]]) {
+      gleam.append(svgElement("stop", { offset, "stop-color": "#efffff", "stop-opacity": opacity }));
+    }
+    defs.append(gleam);
+
+    const texture = svgElement("pattern", { id: "foil-texture", patternUnits: "userSpaceOnUse", width: 13, height: 13 });
+    texture.append(svgElement("path", { d: "M0 13L13 0M-6 6L6 -6M7 20L20 7", stroke: "#ddfaff", "stroke-width": .6, "stroke-opacity": .14 }));
+    texture.append(svgElement("rect", { x: 4, y: 7, width: 1, height: 1, fill: "white", opacity: .24 }));
+    defs.append(texture);
+    overlay.append(defs);
+    const foilLayers = svgElement("g", { mask: "url(#foil-window)" });
+    for (const fill of ["url(#prismatic-color)", "url(#moving-gleam)", "url(#foil-texture)"]) {
+      foilLayers.append(svgElement("rect", { width: WIDTH, height: HEIGHT, fill }));
+    }
+    overlay.append(foilLayers);
+
+    const card = document.getElementById("holo-card");
+    card.append(overlay);
+    const turntable = document.getElementById("turntable");
+    const slider = document.getElementById("light-angle");
+    const angleOutput = document.getElementById("angle-output");
+    const motionButton = document.getElementById("toggle-motion");
+    const holoButton = document.getElementById("toggle-holo");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let playing = !reducedMotion.matches;
+    let frameId = null;
+    let lastTime = null;
+    let angle = 42;
+
+    function setAngle(value) {
+      angle = (Number(value) % 360 + 360) % 360;
+      const rad = angle * Math.PI / 180;
+      const x = Math.cos(rad) * 610;
+      const y = Math.sin(rad) * 610;
+      for (const gradient of [rainbow, gleam]) {
+        gradient.setAttribute("x1", String(411 - x));
+        gradient.setAttribute("y1", String(520 - y));
+        gradient.setAttribute("x2", String(411 + x));
+        gradient.setAttribute("y2", String(520 + y));
+      }
+      slider.value = String(Math.round(angle));
+      angleOutput.value = `${Math.round(angle)}\u00b0`;
+    }
+
+    function animate(time) {
+      if (!playing || document.hidden) {
+        frameId = null;
+        return;
+      }
+      if (lastTime !== null) setAngle(angle + Math.min(time - lastTime, 80) * .018);
+      lastTime = time;
+      frameId = requestAnimationFrame(animate);
+    }
+
+    function setPlaying(value) {
+      playing = value;
+      motionButton.setAttribute("aria-pressed", String(playing));
+      motionButton.textContent = playing ? "Pause reflets" : "Animer les reflets";
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = null;
+      lastTime = null;
+      if (playing && !document.hidden) frameId = requestAnimationFrame(animate);
+    }
+
+    holoButton.addEventListener("click", () => {
+      const enabled = card.dataset.enabled !== "true";
+      card.dataset.enabled = String(enabled);
+      holoButton.setAttribute("aria-pressed", String(enabled));
+      holoButton.textContent = enabled ? "Holo activ\u00e9" : "Holo d\u00e9sactiv\u00e9";
+    });
+    motionButton.addEventListener("click", () => setPlaying(!playing));
+    slider.addEventListener("input", () => {
+      setPlaying(false);
+      setAngle(slider.value);
+    });
+    turntable.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch" || reducedMotion.matches) return;
+      const bounds = turntable.getBoundingClientRect();
+      const x = (event.clientX - bounds.left) / bounds.width - .5;
+      const y = (event.clientY - bounds.top) / bounds.height - .5;
+      card.style.transform = `rotateX(${-y * 11}deg) rotateY(${x * 14}deg)`;
+      if (playing) setAngle(42 + x * 90 + y * 65);
+    });
+    turntable.addEventListener("pointerleave", () => { card.style.transform = ""; });
+    reducedMotion.addEventListener("change", () => setPlaying(!reducedMotion.matches));
+    document.addEventListener("visibilitychange", () => setPlaying(playing));
+    setAngle(angle);
+    setPlaying(playing);
+
+    window.pixelSlimeDemo = {
+      setAngle, setPlaying,
+      exportWhiteInk: () => new XMLSerializer().serializeToString(whiteInk),
+      exportFoil: () => new XMLSerializer().serializeToString(overlay),
+      dimensions: { width: WIDTH, height: HEIGHT }
+    };
+  </script>
+</body>
+</html>
