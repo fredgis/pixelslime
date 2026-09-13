@@ -16,7 +16,10 @@ const SEED_DISCOVERED = [12, 13, 14];
 
 interface DiscoveryState {
   discovered: number[];
+  /** Highest serial included by the visitor's last "Reveal All" action. */
+  revealedThrough: number;
   discover: (serial: number) => void;
+  revealThrough: (serial: number) => void;
   isDiscovered: (serial: number) => boolean;
   reset: () => void;
 }
@@ -25,14 +28,22 @@ export const useDiscoveryStore = create<DiscoveryState>()(
   persist(
     (set, get) => ({
       discovered: SEED_DISCOVERED,
+      revealedThrough: 0,
       discover: (serial) =>
         set((state) =>
           state.discovered.includes(serial)
             ? state
             : { discovered: [...state.discovered, serial] },
         ),
-      isDiscovered: (serial) => get().discovered.includes(serial),
-      reset: () => set({ discovered: [] }),
+      revealThrough: (serial) =>
+        set((state) => ({
+          revealedThrough: Math.max(state.revealedThrough ?? 0, serial),
+        })),
+      isDiscovered: (serial) => {
+        const state = get();
+        return serial <= (state.revealedThrough ?? 0) || state.discovered.includes(serial);
+      },
+      reset: () => set({ discovered: [], revealedThrough: 0 }),
     }),
     { name: 'pixelslime.discovery', version: 1 },
   ),

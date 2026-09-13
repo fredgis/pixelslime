@@ -123,6 +123,21 @@
 @keyframes ps-drift { 0% { transform: translateY(20vh) translateX(0) rotate(-4deg); } 50% { transform: translateY(-10vh) translateX(30px) rotate(4deg); } 100% { transform: translateY(-40vh) translateX(0) rotate(-4deg); } }
 @keyframes ps-segpop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
 @keyframes ps-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ps-dex-reveal {
+  0% { opacity: .25; transform: rotateY(80deg) scale(.88); }
+  58% { opacity: 1; transform: rotateY(-7deg) scale(1.035); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes ps-dex-curtain {
+  0% { opacity: 1; transform: scaleX(1); }
+  78% { opacity: 1; transform: scaleX(0); }
+  100% { opacity: 0; transform: scaleX(0); }
+}
+@keyframes ps-reveal-press {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(3px) scale(.96); }
+  72% { transform: translateY(-2px) scale(1.03); }
+}
 
 /* ══════════════════ ANIMATED TITLE ══════════════════ */
 .ps-hero { text-align: center; position: relative; }
@@ -235,6 +250,21 @@
 .ps-tile.locked .ps-tile__art { background: repeating-linear-gradient(45deg, #3A2C5E 0 12px, #463672 12px 24px); }
 .ps-tile.locked .ps-tile__art svg { filter: brightness(0) opacity(.42); }
 .ps-tile.locked .ps-tile__name { color: var(--ps-ink-soft); }
+.ps-dex-reveal { perspective: 700px; }
+.ps-dex-reveal .ps-tile__art {
+  animation: ps-dex-reveal .55s var(--ps-pop) var(--ps-reveal-delay, 0ms) both;
+}
+.ps-dex-reveal .ps-tile__art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--ps-sunbeam);
+  transform-origin: right center;
+  animation: ps-dex-curtain .55s steps(6, end) var(--ps-reveal-delay, 0ms) both;
+}
+.ps-reveal-all--active { animation: ps-reveal-press .5s var(--ps-pop) both; }
 .ps-holo { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s; background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .62) 45%, rgba(255, 143, 197, .42) 52%, transparent 68%); background-size: 220% 220%; }
 .ps-tile:hover .ps-holo { opacity: var(--ps-holo-strength, 1); animation: ps-sweep 1.3s linear infinite; }
 .ps-newbadge { position: absolute; top: 9px; right: 9px; z-index: 2; font-family: var(--ps-font-pixel); font-size: 9px; background: var(--ps-coral); color: #fff; padding: 5px 8px; border-radius: 8px; border: 2px solid var(--ps-ink); animation: ps-squish 1.4s var(--ps-pop) infinite; }

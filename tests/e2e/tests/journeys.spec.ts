@@ -60,6 +60,56 @@ test.describe('journeys (real backend)', () => {
     await shot(page, '04-dex-legendary');
   });
 
+  test('dex: Reveal All opens every card and persists across reloads', async ({ page, request }) => {
+    const all = await (await request.get('/api/cards')).json();
+
+    await page.goto('/dex');
+    await page.evaluate(() => localStorage.removeItem('pixelslime.discovery'));
+    await settle(page, '/dex', (p) =>
+      p.getByRole('button', { name: new RegExp(`reveal all ${all.total} slimes`, 'i') }).waitFor(),
+    );
+
+    const tiles = page.locator('.ps-tile');
+    await expect(tiles).toHaveCount(all.total);
+    await expect(page.locator('.ps-tile.locked')).toHaveCount(all.total);
+
+    const reveal = page.getByRole('button', {
+      name: new RegExp(`reveal all ${all.total} slimes`, 'i'),
+    });
+    await reveal.click();
+
+    await expect(page.locator('.ps-dex-reveal')).toHaveCount(all.total);
+    await expect(page.locator('.ps-tile.locked')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: new RegExp(`all ${all.total} slimes revealed`, 'i'),
+      }),
+    ).toBeDisabled();
+    await shot(page, '03b-dex-reveal-all');
+
+    await page.reload();
+    await page.getByRole('group', { name: /filter by rarity/i }).waitFor();
+    await expect(page.locator('.ps-tile.locked')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: new RegExp(`all ${all.total} slimes revealed`, 'i'),
+      }),
+    ).toBeDisabled();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    const revealedButton = page.getByRole('button', {
+      name: new RegExp(`all ${all.total} slimes revealed`, 'i'),
+    });
+    await expect(revealedButton).toBeDisabled();
+    const buttonBox = await revealedButton.boundingBox();
+    expect(buttonBox?.height).toBeGreaterThanOrEqual(44);
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+  });
+
   test('dex pagination is stable and sorts are deterministic (API level)', async ({ request }) => {
     // The UI only renders pager controls when total > PAGE_SIZE (24). With three seed
     // cards it never does, so pagination stability is verified where it actually lives:
